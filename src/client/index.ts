@@ -66,7 +66,7 @@ declare function require(id: string): any
 		// dsh-better-sidebar have no such module-table key, and a strict
 		// resolver throws on the ctx.betterSidebar property access itself
 		// (issue #29). Probe it defensively below instead.
-		const inject = ['slots', 'locale', 'connection', 'betterSidebar']
+		const inject = ['slots', 'locale', 'connection']
 
 		// ── Settings card: locale ─────────────────────────────────────────
 		var SETTINGS_NS = 'ego-browser'
