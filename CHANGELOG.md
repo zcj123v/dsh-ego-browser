@@ -2,6 +2,14 @@
 
 所有对用户可见的变更集中在各版本号下。格式遵循 [Keep a Changelog](https://keepachangelog.com/)，版本语义遵循 [SemVer](http://semver.org/)。
 
+## [0.8.4] - 2026-09-08 — fork 首版：rc.1 settings SDK 验证锁定
+
+### 变更
+- fork 自 Fisfzy/dsh-ego-browser main（0.8.3），代码逻辑与上游 0.8.3 一致——上游 0.8.3 已完成 `@deepseek-ai/dsh-settings` 0.1.2-rc.1 适配（`ctx.settings.register` + scope `watch`，无 `settingsNamespace`/`installSettingsSection` 残留）。
+- devDependencies 显式锁定 SDK 类型与运行时图：`@deepseek-ai/dsh-settings`、`@deepseek-ai/dsh-tools`、`@deepseek-ai/cordis`、`@deepseek-ai/dsh-llm`、`@deepseek-ai/dsh-scope` 均为 `^0.1.2-rc.1`（仓库 `.npmrc` 关闭 auto-install-peers，此前类型检查依赖外部环境）。
+- 以 dsh-settings 0.1.2-rc.1 实际类型完成 `pnpm typecheck`（host + client 两个 program）与全量 vitest；`tests/capture-ffmpeg.test.ts` 的 Windows Media Foundation 用例在本机（macOS）失败，pristine 上游 main 同样失败，属环境相关既有问题，与本次改动无关。
+- 重新构建 lib/、bin/ 产物并重打 tarball（npm pack，`!**/*.map` 排除映射文件）。
+
 ## [0.8.3] - 2026-09-07 — DSH 0.1.2-rc.1 兼容 + 安全/稳定性修复
 
 ### 安全
