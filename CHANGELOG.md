@@ -2,6 +2,16 @@
 
 所有对用户可见的变更集中在各版本号下。格式遵循 [Keep a Changelog](https://keepachangelog.com/)，版本语义遵循 [SemVer](http://semver.org/)。
 
+## [0.8.6] - 2026-09-11 — DSH 0.1.5-rc.1 兼容 + Windows 编码探测修复
+
+### 变更
+- **DSH 0.1.5-rc.1 兼容声明**：`dsh.engines.dsh` 与 6 个 peerDependencies（`dsh-client-locale` / `dsh-client-store` / `dsh-client-ui-settings-plugins` / `dsh-client-ui-slots` / `dsh-settings` / `dsh-tools`）从 `>=0.1.2-rc.1` 改为 `^0.1.5-rc.1`；devDependencies 的 `dsh-settings` / `dsh-tools` / `dsh-llm` / `dsh-scope` 同步改为 `^0.1.5-rc.1`。semver 预发布规则下 `>=0.1.2-rc.1` 与 `^0.1.2-rc.1` 都不匹配 `0.1.5-rc.1`，必须显式收紧到 `^0.1.5-rc.1`（同时覆盖 rc.1/rc.2）。
+- 以 0.1.5-rc.1 实际类型重跑 `pnpm typecheck`（host + client 两个 program）、全量 vitest、`tsdown` 构建并重打 tarball。0.1.5 对本插件使用的 API 面（`ctx.settings.register` + scope `watch`、`ctx.slots.inject/register`、`ctx.locale.register`、client 侧 `createSnapshotStore`、`ctx.subprocess`、`webServer`）没有破坏性变更，源码无需其他改动。
+- `pnpm-workspace.yaml` 记录 `minimumReleaseAgeExclude`（pnpm 11 的 24h 新版本冷却豁免），保证 0.1.5-rc.1 系列可复现安装。
+
+### 修复
+- **Windows gfxcapture 探测在注入 platform 下走错分支**（`src/worker/capture-ffmpeg.ts`）：`selectEncoder` 已接受注入的 `platform`，但候选表用了 `process.platform === 'darwin'` 而非 `platform === 'darwin'`，且调用 `buildCaptureInput` 时未透传 `platform`（该函数默认回落到真实 `process.platform`）。在 Windows 上两者恰好同值所以生产路径无感，但在非 Windows 机器上跑 Windows 用例时，探测命令变成 avfoundation/x11grab 输入、不含 `gfxcapture=hwnd=<hwnd>`，`tests/capture-ffmpeg.test.ts` 的 Media Foundation 用例必然失败。现两处统一使用注入的 `platform`，该用例在任何平台都能反映真实行为（此前 0.8.4 记录为“macOS 环境相关既有失败”）。
+
 ## [0.8.4] - 2026-09-08 — fork 首版：rc.1 settings SDK 验证锁定
 
 ### 变更
