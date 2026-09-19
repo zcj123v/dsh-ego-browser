@@ -5,13 +5,42 @@
   <a href="https://dshfind.com/zh/plugins/Fisfzy/ego-browser"><img src="https://dshfind.com/api/card/Fisfzy/ego-browser?lang=zh" alt="ego-browser card"></a>
 </p>
 
+<p align="center">
+  <img src="https://img.shields.io/badge/DSH-%5E0.1.5--rc.1-blue" alt="DSH ^0.1.5-rc.1">
+  <img src="https://img.shields.io/badge/DSH--better--sidebar-%3E%3D0.12.2(optional)-red" alt="dsh-better-sidebar >= 0.12.2 (optional)">
+  <img src="https://img.shields.io/badge/Node-%3E%3D22-brightgreen?logo=node.js&logoColor=white" alt="Node >= 22">
+</p>
+
 > **仓库**：`github.com/Fisfzy/ego-browser`｜版本历史见 [CHANGELOG.md](CHANGELOG.md)｜详情页：[dshfind](https://dshfind.com/zh/plugins/Fisfzy/ego-browser)
 
-**DSH 版本支持**：本版本 **v0.8.7** 针对 **DeepSeek Harness `0.1.5-rc.2`** 验证（`engines.dsh` 与 peer 依赖声明保持 `^0.1.5-rc.1`——semver 预发布规则下该范围同时匹配 `0.1.5-rc.1` 与 `0.1.5-rc.2`，因此本版本在 rc.1 宿主上同样可装，便于插件先于 harness 升级部署。已在 0.1.5-rc.2 的实际 SDK 类型下完成 `pnpm typecheck`（host + client）、全量 vitest（91 项）与 `tsdown` 构建；**尚未在升级后的真实宿主上做安装/工具调用验收**，0.8.3 记录的 0.1.2-rc.1 + Windows + web profile 实机验收不能直接代表本版本）。**0.1.2-rc.1 ～ 0.1.3-alpha.x 宿主请使用 v0.8.5**（其 `engines.dsh` 地板为 `>=0.1.2-rc.1`）；**0.1.0-rc.x / 0.1.1-rc.x 宿主请使用 v0.8.0 及更早版本**。v0.8.6 → v0.8.7 没有源码改动：刷新依赖解析到 0.1.5-rc.2 后重新验证，本插件使用的 API 面（`ctx.settings.register` + scope `watch`、`ctx.slots.inject/register`、`ctx.locale.register`、client 侧 `createSnapshotStore`、`ctx.subprocess`、`webServer`）无破坏性变更。此前 0.8.3 的适配点仍然有效：client 运行时改名（`@deepseek-ai/dsh-client-store`）、client 模块注册 id 与装载行名按声明包名、`dsh.client.inject` 仅声明真实模块图行、`webServer` 以嵌套注入交付（可选服务），并同步侧边栏 Tab（dsh-better-sidebar）模式。
+**DSH 版本支持**：本版本 **v0.9.0** 针对 **DeepSeek Harness `0.1.5-rc.2`** 验证，并已**合并上游 `Fisfzy/ego-browser` 至 v0.8.5**（此前本 fork 落后 35 个提交、功能面不重叠；本次已全部并入，逐条见 [CHANGELOG.md](CHANGELOG.md)）。`engines.dsh` 与 peer 依赖声明保持 `^0.1.5-rc.1`——semver 预发布规则下该范围同时匹配 `0.1.5-rc.1` 与 `0.1.5-rc.2`，因此本版本在 rc.1 宿主上同样可装，便于插件先于 harness 升级部署。已在 0.1.5-rc.2 的实际 SDK 类型下完成 `pnpm typecheck`（host + client）、全量 vitest（91 项）与 `tsdown` 构建；**尚未在升级后的真实宿主上做安装/工具调用验收**，0.8.3 记录的 0.1.2-rc.1 + Windows + web profile 实机验收不能直接代表本版本）。**0.1.2-rc.1 ～ 0.1.3-alpha.x 宿主请使用 v0.8.5**（其 `engines.dsh` 地板为 `>=0.1.2-rc.1`）；**0.1.0-rc.x / 0.1.1-rc.x 宿主请使用 v0.8.0 及更早版本**。v0.8.6 → v0.8.7 没有源码改动：刷新依赖解析到 0.1.5-rc.2 后重新验证，本插件使用的 API 面（`ctx.settings.register` + scope `watch`、`ctx.slots.inject/register`、`ctx.locale.register`、client 侧 `createSnapshotStore`、`ctx.subprocess`、`webServer`）无破坏性变更。此前 0.8.3 的适配点仍然有效：client 运行时改名（`@deepseek-ai/dsh-client-store`）、client 模块注册 id 与装载行名按声明包名、`dsh.client.inject` 仅声明真实模块图行、`webServer` 以嵌套注入交付（可选服务），并同步侧边栏 Tab（dsh-better-sidebar）模式。
+### 版本兼容矩阵
 
-**侧边栏支持（[dsh-better-sidebar](https://www.npmjs.com/package/dsh-better-sidebar)）**：当宿主安装了 `dsh-better-sidebar`（实测 0.17.x）时，实时观察窗注册为**侧边栏原生 Tab**——「Agent 浏览器」出现在侧边栏「+」菜单中，点击即打开并随侧边栏抽屉固定展示；agent 首次调用 `ego_*` 工具时会自动打开该 Tab。未安装 `dsh-better-sidebar` 时自动回退为右下角**浮动观察球**（`#dsh-ego-fab`）模式。两种形态共用同一套 SSE 实时推流 / 点击 / 输入 / 下载捕获能力。
+| 依赖 | 最低版本 | 推荐版本 | 说明 |
+|---|---|---|---|
+| **DSH** (DeepSeek Harness) | `0.1.5-rc.1` | `≥ 0.1.5-rc.1`（截至 v0.1.5-rc.2 验证通过） | 本 fork 的 `engines.dsh` 声明地板；peer 依赖同步锁定 `^0.1.5-rc.1`（semver 预发布规则下同时匹配 rc.1 / rc.2）。0.1.2-rc.1 ～ 0.1.3-alpha.x 宿主请使用 v0.8.5；0.1.0-rc.x / 0.1.1-rc.x 请使用 v0.8.0 及更早版本 |
+| **dsh-better-sidebar** | `0.12.2`（可选） | `≥ 0.17.1` | 未安装时自动回退浮动观察球；`< 0.12.2` 可运行但外部链接拦截（`urlTarget`）静默降级 |
+| **Node.js** | `22` | — | harness 环境自带 |
 
-把 [CitroLabs/ego-lite](https://github.com/CitroLabs/ego-lite)（给 AI Agent 用的 Chromium）接入 DeepSeek Harness：以 **32 个结构化 `ego_*` 工具**驱动浏览器，并配一套**实时观察前端口**——agent 后台操作网页时，你能像看直播一样看到它正在浏览的每个页面，还能直接操作它。
+**DSH 全版本适配说明**：本版本 v0.9.0 的源码已通过审计确认与 DSH `0.1.2-rc.1` 至 `0.1.5-rc.2` 全部发布版本兼容（`defineTool`、`ctx.tools.register`、`ctx.subprocess.spawn`、`ctx.webServer.register`、`ctx.inject`、`ModuleLoader` CJS factory、`cordis.patch.yml` 等核心 API 在 v0.1.0-rc.7 → v0.1.5-rc.2 无破坏性变更）。但本 fork 的 `engines.dsh` 声明地板为 `^0.1.5-rc.1`，低于该地板的宿主请使用 v0.8.5 或更早的 fork 版本；0.1.2-alpha.x 系列按声明可装但未实测。
+
+**dsh-better-sidebar 适配说明**：ego-browser 通过 `ctx.betterSidebar` 服务（try-catch 防御性获取）注册侧边栏 Tab 并监听外部链接。关键 API 引入版本：
+
+| API | ego-browser 用法 | better-sidebar 引入版本 |
+|---|---|---|
+| `registerTab()` / `openTab()` / `ctx.betterSidebar` | Tab 注册 + 打开 | v0.9.0+ |
+| `TabDescriptor.single` | 单实例 Tab | v0.9.0+ |
+| `TabDescriptor.urlTarget` | 外部链接拦截 | **v0.12.2+**（低于此版本链接拦截静默失效） |
+
+---
+
+**DSH 版本支持详情**：v0.8.2 → v0.8.3 主要变更：合并 6 个社区 PR（root/xvfb/macOS headless 适配、rc.1 兼容、Windows 稳定性），修复无认证 `/api/ego/*` 路由安全漏洞、无 dsh-better-sidebar 宿主 client 启动失败（#29）、Windows 冷启动回归（#22 引入的 Xvfb 误判），并修复 gateway 设置白名单缺 `egoCliArgs`/`chromeArgs`。适配点：client 运行时改名（`@deepseek-ai/dsh-client-store`）、client 模块注册 id 与装载行名按声明包名、`dsh.client.inject` 仅声明真实模块图行、`webServer` 以嵌套注入交付（可选服务），并同步侧边栏 Tab（dsh-better-sidebar）模式。
+
+**侧边栏支持（[dsh-better-sidebar](https://www.npmjs.com/package/dsh-better-sidebar)）**：当宿主安装了 `dsh-better-sidebar`（推荐 ≥ v0.12.2）时，实时观察窗注册为**侧边栏原生 Tab**——「Agent 浏览器」出现在侧边栏「+」菜单中，点击即打开并随侧边栏抽屉固定展示；agent 首次调用 `ego_*` 工具时会自动打开该 Tab（v0.8.5 起按调用会话作用域打开，多会话不再弹错位置）。未安装 `dsh-better-sidebar` 时自动回退为右下角**浮动观察球**（`#dsh-ego-fab`）模式。两种形态共用同一套 SSE 实时推流 / 点击 / 输入 / 下载捕获能力。观察窗还提供一个「弹出窗口」按钮：无头（headless）运行的 agent 浏览器可一键替换为同 Profile 的有头窗口（标签页保留），方便手动接管。
+
+**登录态导入（上游 v0.8.5 新增，本 v0.9.0 并入）**：设置页「从系统浏览器导入登录态」或工具 `ego_login_import`，把你日常 Chrome/Edge/Brave 里的登录 cookie **按域名**复制进 agent 浏览器（真实二进制无头启动 + CDP 透传读取，兼容 Chrome 127+ 的 App-Bound Encryption，不做离线解密；源浏览器运行中可选择优雅关闭后导入，窗口下次启动自动恢复）。cookie 值不出现在任何日志与输出中；导入前自动备份源 cookie 库，异常清空自动还原。配合默认的磁盘持久化 Profile，导入的登录态跨重启永久保留。
+
+把 [CitroLabs/ego-lite](https://github.com/CitroLabs/ego-lite)（给 AI Agent 用的 Chromium）接入 DeepSeek Harness：以 **33 个结构化 `ego_*` 工具**驱动浏览器，并配一套**实时观察前端口**——agent 后台操作网页时，你能像看直播一样看到它正在浏览的每个页面，还能直接操作它。
 
 **一点私藏的独特之处（self-observation）**：agent 用的就是这一个 Chromium——连它操作 **DSH 自身**（管理会话、任务看板、调设置）时，观察窗也实时显示、你能随时接手。不只是"看得见 agent 在网页上干活"，连 agent 操作 DSH 界面本身都是全程可见、可掌控的。
 
@@ -46,7 +75,7 @@
 | **观察窗前端口** | ego-lite 本体是无头 CLI（只有 heredoc 脚本 + 文本输出）；我们在其上加了 **SSE 实时推流 + 标签条 + 历史抽屉 + 监控窗鼠标直操**（`bin/ego-cast-worker.mjs`、`lib/cast-server.js`、`lib/client.js`），让"看"和"控"成为一等能力 |
 | **开箱即用 + 跨平台自足** | `resolveEgoEnv` 自动探测 Chrome/Edge/Brave，内置 `--no-sandbox` wrapper，root / Docker / 无显示器免配置（`lib/index.js`）；不必像官方那样先装一个 GUI 宿主 |
 | **健壮性层** | 冷启动自动重试（只重试 CDP 瞬态，不吞真错）、worker 单实例守卫 + 崩溃自动重启、插件卸载 fire-and-forget 不阻塞宿主退出、前端帧缓存上限（`withWarmupRetry` / `makeEnsureWorker` / `frameCache`） |
-| **运维型工具** | `ego_doctor`（环境体检）、`ego_captcha`（人机验证探测）、`ego_auth_flush`（登录落盘）、`ego_http`（浏览器上下文请求）等，是原生 CLI helper 没有的一层 |
+| **运维型工具** | `ego_doctor`（环境体检）、`ego_captcha`（人机验证探测）、`ego_auth_flush`（登录落盘）、`ego_login_import`（系统浏览器登录态导入）、`ego_http`（浏览器上下文请求）等，是原生 CLI helper 没有的一层 |
 | **self-observation** | agent 操作 DSH 自身界面时同样实时可见、可接手 |
 
 > 我们不声称媲美官方 macOS App 的内核级快照或原生多窗口体验；本仓库解决的是"把同一套浏览器能力带进 DSH + Linux/WSL + 看得见"这件事。
@@ -176,7 +205,7 @@ pnpm run build   # tsdown 三 bundle：lib/index.js + lib/client.js + bin/ego-ca
 - **宿主可靠性（Linux）**：未合并的社区 PR，跨 CLI 调用间可能丢 tab/空间状态；插件已内置防御，简单流程稳定，复杂流程可能需重试。
 - **登录态持久化**：Chrome 运行期 Cookie 仅优雅关闭时落盘，强杀重启需重登。
 - 输出 schema 为宽松 `additionalProperties: true`，客户端以实际返回值为准。
-- **落后上游**：本 fork 的上游 `Fisfzy/dsh-ego-browser` 已前进到 **v0.8.5**（`git rev-list` 计落后 35 个提交，含 login cookie 导入、空闲回收、看板 i18n 等功能）。本 fork 未合并这些提交，当前分支只含 rc.1/rc.2 兼容适配与上述缺陷修复，两者功能面不重叠。
+- **上游同步状态**：本 fork 已于 2026-09-19 合并上游 `Fisfzy/ego-browser` 的 **v0.8.5**（合并前落后 35 个提交，含 login cookie 导入、空闲自动回收、观察窗「弹出窗口」、看板 i18n 等）。当前分支 = 上游 v0.8.5 + 本 fork 的 rc.1/rc.2 兼容适配与既有缺陷修复，此前的「落差」已消除；后续上游新提交仍会周期性合并。
 
 ## 许可与署名
 

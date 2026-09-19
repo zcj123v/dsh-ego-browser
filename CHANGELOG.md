@@ -2,6 +2,38 @@
 
 所有对用户可见的变更集中在各版本号下。格式遵循 [Keep a Changelog](https://keepachangelog.com/)，版本语义遵循 [SemVer](http://semver.org/)。
 
+## [0.9.0] - 2026-09-19 — 合并上游 v0.8.5（登录态导入 / 空闲回收 / 观察窗修复群）
+
+### 合并
+- **并入上游 `Fisfzy/ego-browser` 的 35 个提交**（`master` @ `2d9ad51`，v0.8.5）。合并前本 fork 落后 35 个提交、领先 4 个。本次以 `git merge upstream/master` 完成；**未使用 `-X ours/theirs` 之类整体偏向策略，也未 rebase 已推送历史**。回退锚点：本地分支 `backup/pre-upstream-merge-20260919`（= 合并前 `b4ef9c4`）。
+- 上游带入的功能与修复：`ego_login_import` 工具 + 设置卡导入区块 + `POST /api/ego/login-import` 路由（#46）、`idleTimeoutMin` 空闲自动回收（#47）、观察窗「弹出窗口」（#51）、滚动后 viewport 截图全白（PR #50）、观察窗抢走聊天外链（#48）、浏览器重启后 task space 悬空、多会话观察窗定位（#53 / PR #54）、观察窗英文 i18n（PR #52）、观察窗 worker 启动链修复（#34 / #38 / #40 / #43）、Electron 宿主 `ELECTRON_RUN_AS_NODE`（#42）、worker 宕机时 quiet SSE（#39 / PR #44）、`isolateSpaces` 沙盒开关（PR #31）、README 版本兼容矩阵（PR #36）。
+
+### 冲突消解（9 个文件，逐个人工处理）
+- `src/client/index.ts`：**仅注释措辞冲突**。两侧代码完全一致（`inject = ['slots', 'locale', 'connection']`）——上游 `8e77b83` 与本 fork `9ebdfe4` 独立修掉了同一个「静态 inject `betterSidebar` 导致宿主 web boot 永久 pending」缺陷。取上游注释（对 pending 机制描述更准确），fork 修复本身由此天然保留。
+- `package.json`：取本 fork 的 `version` / `description`（`engines.dsh`、6 个 peerDependencies 与 SDK devDependencies 的 `^0.1.5-rc.1` 声明为本 fork 独有；上游仍是 `>=0.1.2-rc.1` 且无显式 SDK devDependencies）；版本号按本次新版本改写。
+- `pnpm-workspace.yaml`：**保留本 fork 的既定写法**（`allowBuilds: esbuild: true` 的 pnpm 12 形式 + `minimumReleaseAgeExclude: ['@deepseek-ai/*']` scope 通配）。上游新增的旧式 `onlyBuiltDependencies: [esbuild]` 与之语义重复，丢弃。
+- `README.md`：保留上游新增的 `### 版本兼容矩阵` 结构与徽章区块，同时保留本 fork 的「DSH 版本支持」段并更新到 v0.9.0；修正自动合并带入的上游声明（徽章与矩阵行的 DSH 地板改回本 fork 的 `^0.1.5-rc.1`，并保留「低于地板用 v0.8.5」的指引）。
+- **生成产物**（`lib/index.js`、`lib/client.js`、`lib/client.js.map`、`bin/ego-cast-worker.mjs`）：不手工合并构建产物，统一在合并后的 `src/` 上跑 `pnpm build` 重新生成（`tsdown` 的 host / client / worker 三个 target），保证产物与合并后源码一致。
+
+### 保留的 fork 侧改动（逐条核对）
+- **betterSidebar 静态 inject 移除**：与上游 `8e77b83` 合流；重建后的 `lib/client.js` 中 `inject` 仍为 `["slots","locale","connection"]`，`betterSidebar` 只以 `ctx.get` / `ctx.inject` 防御式探测出现。
+- **Windows gfxcapture 探测分支修复**（`src/worker/capture-ffmpeg.ts`，来自 0.8.6）：上游自合并基点起**未改动**该文件，合并后 `selectEncoder` 仍使用注入的 `platform`（`platform === 'darwin'`）并向 `buildCaptureInput` 透传 `platform`，修复完整保留。
+- **rc.1 / rc.2 平台适配**：`engines.dsh` 与 peer 依赖保持 `^0.1.5-rc.1`（同时匹配 rc.1 与 rc.2），SDK devDependencies 保持显式声明。
+- **`pnpm-workspace.yaml`**：见上，以 fork 写法为准。
+
+### 修复（fork 侧，上游遗留）
+- **`tests/login-import.test.ts` 的 Windows 路径断言在非 Windows 上必红**：上游新增的该用例把 `profilesFromLocalState(json, "C:\\UD")` 的期望值硬编码为 `C:\\UD\\Default`，而该函数用 `node:path` 的 `join()` 拼接，POSIX 下返回 `C:\\UD/Default`。**已确认 pristine 上游 `master` 在同一台 macOS 上以完全相同的方式失败**（上游仓库无 CI，故未被发现）。改为用 `join(tmpdir(), "ud")` 构造原生路径、并用 `join()` 表达期望值：语义不变且跨平台成立。
+
+### 验证
+- `pnpm typecheck`：**通过** —— `tsc -p tsconfig.json && tsc -p tsconfig.client.json`（host + client 两个 program），exit 0。
+- `pnpm test`：**通过** —— 19 个测试文件（18 passed / 1 skipped）；**123 passed / 5 skipped / 共 128 项**。跳过者为 `tests/login-import-e2e.test.ts`（需要真实 Chrome 的端到端用例，环境门控）。
+- `pnpm build`：**通过** —— `tsdown` 生成 `lib/index.js`（157.9 kB）、`lib/client.js`（144.9 kB）+ map、`bin/ego-cast-worker.mjs`（180.4 kB）+ map。
+- `pnpm install`：pnpm 12.4.2；`@deepseek-ai/*` 解析到 **0.1.5-rc.2**，印证 `^0.1.5-rc.1` 范围同时覆盖 rc.1 / rc.2。
+- **尚未在真实 DSH 宿主上做安装 / 工具调用验收**（与 0.8.6 / 0.8.7 同样的诚实标注）；本次只完成类型、单测与构建三门。
+
+### 版本号
+- `0.8.7` → **`0.9.0`**：本次并入的是**新增功能**（登录态导入、空闲回收、观察窗弹出真实窗口、观察窗英文 i18n），按 SemVer 属向后兼容的功能新增，取 MINOR 位；同时高于上游 `0.8.5` 与本 fork 的 `0.8.7`，消除两条版本线的歧义。
+
 ## [0.8.7] - 2026-09-19 — DSH 0.1.5-rc.2 验证
 
 ### 变更
@@ -26,6 +58,43 @@
 - devDependencies 显式锁定 SDK 类型与运行时图：`@deepseek-ai/dsh-settings`、`@deepseek-ai/dsh-tools`、`@deepseek-ai/cordis`、`@deepseek-ai/dsh-llm`、`@deepseek-ai/dsh-scope` 均为 `^0.1.2-rc.1`（仓库 `.npmrc` 关闭 auto-install-peers，此前类型检查依赖外部环境）。
 - 以 dsh-settings 0.1.2-rc.1 实际类型完成 `pnpm typecheck`（host + client 两个 program）与全量 vitest；`tests/capture-ffmpeg.test.ts` 的 Windows Media Foundation 用例在本机（macOS）失败，pristine 上游 main 同样失败，属环境相关既有问题，与本次改动无关。
 - 重新构建 lib/、bin/ 产物并重打 tarball（npm pack，`!**/*.map` 排除映射文件）。
+
+---
+
+### 上游 `Fisfzy/ego-browser` 条目（版本号与本 fork 线独立，2026-09-19 随 v0.9.0 合并并入）
+
+## [0.8.5] - 2026-09-18 — 登录态导入 + 空闲回收 + 观察窗修复群（上游）
+
+### 新增
+- **从系统浏览器导入登录态（#46）**：新工具 `ego_login_import` + 设置卡「从系统浏览器导入登录态」区块 + `POST /api/ego/login-import` 路由。把日常 Chrome/Edge/Brave 的登录 cookie 按域名复制进 agent 浏览器：真实二进制无头启动真实 Profile（junction 别名绕过 Chromium ≥136 默认目录 CDP 限制，同时满足 App-Bound Encryption 的路径绑定），CDP `Storage.getCookies` 读取、过滤、`Storage.setCookies` 写入持久 Profile。支持 `source/domains/profile/closeSource/dryRun`；源浏览器运行中可优雅关闭后导入（窗口下次启动恢复）；**导入前自动备份源 cookie 库，检测到清空自动还原**；cookie 值不进日志与输出。
+- **空闲自动回收（#47，opt-in）**：新设置 `idleTimeoutMin`（默认 0 关）。N 分钟无 ego_* 调用后优雅 `--stop` 后台浏览器（实测空闲 ~425MB），下次调用 2-4s 冷启动。观看观察窗不算活动（设置文案已注明）。
+- **观察窗「弹出窗口」按钮（#51）**：浮动面板与侧边栏 Tab 新增按钮，调用运行时 `ego-browser --open`——无头实例原地替换为同 Profile 有头窗口（标签页保留），有头则置前。无头模式的 CDP 预览本就可用的结论也已实测确认。
+
+### 修复
+- **滚动后 viewport 截图全白**（PR #50）：`Page.captureScreenshot` 的 clip 原点是文档坐标，viewport 截图原先固定 `{x:0,y:0}`，滚动后 clip 落在未绘制区域（`captureBeyondViewport: false`）得到空白图。现用 `pageInfo().sx/sy`（`scrollX/scrollY`）作为 clip 原点；locator 的 viewport boundingBox 同样加上滚动偏移，与 `spaces-server` followClip 一致。
+- **聊天外链被观察窗抢走且无法渲染（#48）**：侧边栏 Tab 的 `urlTarget` 声明过宽（认领所有 http(s)），但该 Tab 只是推流画面。已移除声明，外链回归内置 browser 标签。
+- **浏览器重启后 ego_* 全部报 task space not found**：插件侧记住的数字空间 id 在重启后悬空。新增 `runWithStaleSpaceRetry`：识别该错误后自动用空间名重建并重试一次（动作工具 + ego_cli/ego_captcha/ego_script 全覆盖）。
+- **多会话时观察窗弹到错误会话（#53，PR #54）**：`markEgoToolCall` 携带调用会话 id，自动打开按会话作用域定位侧边栏；一次性守卫改为按会话，探测流常驻。
+
+### 社区
+- 合并 PR #50（截图修复，hpqc032）、#52（观察窗英文 i18n，M4cd1r；我们补了 `wt()` 默认值修复恢复 typecheck）、#54（会话作用域，xiaochaZ）。
+
+## [0.8.4] - 2026-09-15 — 观察窗 worker 启动链修复 + 社区 PR 合并（上游）
+
+### 修复
+- **观察窗在 DSH ≥ 0.1.5 永不启动（#34 / #38 / #43）**：worker spawn 缺少 0.1.5 subprocess provider 必填的 `cwd`，异常被裸 `catch` 吞掉导致 `ensureWorker()` 永远返回 null。已补 `cwd`。
+- **worker 启动即自杀（#34 缺陷2 / #40）**：`stopSiblingWorkers()` 的松散子串匹配把 DSH subprocess runner 误判为同侪 worker，`taskkill /T` 连带杀掉自己的进程树，worker 在写 `ego-cast.json` 前死亡。匹配收紧为「node 的直接脚本参数是 ego-cast-worker.mjs」并排除自身祖先进程链。
+- **Electron 宿主（DSH Desktop）全部 ego_* 报 no @@DSH_RESULT@@（#42）**：spawn 传显式 env 时缺 `ELECTRON_RUN_AS_NODE`，子进程被当成第二个 Electron 应用启动。`resolveEgoEnv` 与 worker spawn 在 `process.versions.electron` 存在时自动补 `ELECTRON_RUN_AS_NODE=1`。
+- **worker 宕机时 /api/ego/stream 空响应（#39，PR #44）**：`proxyWorkerStream(-1)` 短路为 quiet SSE（写 `text/event-stream` 头后保持安静长连接），不再触发 `ERR_SOCKET_BAD_PORT` 把连接撕掉；含 42 行新测试。
+- **Windows 下 EGO_LINUX_HEADLESS 被静默忽略（#35）**：显式 `EGO_LINUX_HEADLESS=1` 现在优先于 win32 的 `hasDisplay=true` 默认推断，与 CLI help / README 文档一致。
+- **无 dsh-better-sidebar 宿主 web boot 整体阻断**：client 静态 inject 列表移除 `betterSidebar`（loader 会永远等待缺失服务），改为 `ctx.get` 探测 + 浮动观察球立即挂载 + 服务后出现时经 `ctx.inject` 升级为侧边栏 Tab（致谢 PR #45 的方案）。
+
+### 新增
+- **`isolateSpaces` 任务空间沙盒隔离开关（PR #31）**：默认关闭，任务空间复用磁盘持久化 Profile，登录态跨重启永久保留（覆盖 #1 诉求）；开启后恢复内存沙盒隔离。`ego_space_open`/`ego_space_close` 工具描述随模式动态注入；修复 gateway 布尔设置无法持久化的问题。
+
+### 其他
+- 修复 `pnpm-workspace.yaml` 未填的 `allowBuilds` 模板占位符导致 pnpm 11 无法 install；补 `isolateSpaces` 的 config 测试夹具。
+- 合并 PR #36（README 版本兼容矩阵）、#31、#44；关闭被覆盖的 #45。
 
 ## [0.8.3] - 2026-09-07 — DSH 0.1.2-rc.1 兼容 + 安全/稳定性修复
 
