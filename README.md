@@ -7,7 +7,7 @@
 
 > **仓库**：`github.com/Fisfzy/ego-browser`｜版本历史见 [CHANGELOG.md](CHANGELOG.md)｜详情页：[dshfind](https://dshfind.com/zh/plugins/Fisfzy/ego-browser)
 
-**DSH 版本支持**：本版本 **v0.8.6** 针对 **DeepSeek Harness `0.1.5-rc.1`** 适配（`engines.dsh` 声明 `^0.1.5-rc.1`；peer 依赖同步锁定 `^0.1.5-rc.1`。已在 0.1.5-rc.1 的实际 SDK 类型下完成 `pnpm typecheck`（host + client）、全量 vitest 与构建；**尚未在升级后的真实宿主上做安装/工具调用验收**，0.8.3 记录的 0.1.2-rc.1 + Windows + web profile 实机验收不能直接代表本版本）。**0.1.2-rc.1 ～ 0.1.3-alpha.x 宿主请使用 v0.8.5**（其 `engines.dsh` 地板为 `>=0.1.2-rc.1`）；**0.1.0-rc.x / 0.1.1-rc.x 宿主请使用 v0.8.0 及更早版本**。v0.8.5 → v0.8.6 主要变更：兼容声明收紧到 0.1.5-rc.1（semver 预发布规则下 `>=0.1.2-rc.1` 不匹配 `0.1.5-rc.1`），修复 Windows gfxcapture 编码探测在注入 platform 下走错分支（`selectEncoder` 未把注入的 `platform` 透传给 `buildCaptureInput`，导致非 Windows 机器上该用例必然失败）。此前 0.8.3 的适配点仍然有效：client 运行时改名（`@deepseek-ai/dsh-client-store`）、client 模块注册 id 与装载行名按声明包名、`dsh.client.inject` 仅声明真实模块图行、`webServer` 以嵌套注入交付（可选服务），并同步侧边栏 Tab（dsh-better-sidebar）模式。
+**DSH 版本支持**：本版本 **v0.8.7** 针对 **DeepSeek Harness `0.1.5-rc.2`** 验证（`engines.dsh` 与 peer 依赖声明保持 `^0.1.5-rc.1`——semver 预发布规则下该范围同时匹配 `0.1.5-rc.1` 与 `0.1.5-rc.2`，因此本版本在 rc.1 宿主上同样可装，便于插件先于 harness 升级部署。已在 0.1.5-rc.2 的实际 SDK 类型下完成 `pnpm typecheck`（host + client）、全量 vitest（91 项）与 `tsdown` 构建；**尚未在升级后的真实宿主上做安装/工具调用验收**，0.8.3 记录的 0.1.2-rc.1 + Windows + web profile 实机验收不能直接代表本版本）。**0.1.2-rc.1 ～ 0.1.3-alpha.x 宿主请使用 v0.8.5**（其 `engines.dsh` 地板为 `>=0.1.2-rc.1`）；**0.1.0-rc.x / 0.1.1-rc.x 宿主请使用 v0.8.0 及更早版本**。v0.8.6 → v0.8.7 没有源码改动：刷新依赖解析到 0.1.5-rc.2 后重新验证，本插件使用的 API 面（`ctx.settings.register` + scope `watch`、`ctx.slots.inject/register`、`ctx.locale.register`、client 侧 `createSnapshotStore`、`ctx.subprocess`、`webServer`）无破坏性变更。此前 0.8.3 的适配点仍然有效：client 运行时改名（`@deepseek-ai/dsh-client-store`）、client 模块注册 id 与装载行名按声明包名、`dsh.client.inject` 仅声明真实模块图行、`webServer` 以嵌套注入交付（可选服务），并同步侧边栏 Tab（dsh-better-sidebar）模式。
 
 **侧边栏支持（[dsh-better-sidebar](https://www.npmjs.com/package/dsh-better-sidebar)）**：当宿主安装了 `dsh-better-sidebar`（实测 0.17.x）时，实时观察窗注册为**侧边栏原生 Tab**——「Agent 浏览器」出现在侧边栏「+」菜单中，点击即打开并随侧边栏抽屉固定展示；agent 首次调用 `ego_*` 工具时会自动打开该 Tab。未安装 `dsh-better-sidebar` 时自动回退为右下角**浮动观察球**（`#dsh-ego-fab`）模式。两种形态共用同一套 SSE 实时推流 / 点击 / 输入 / 下载捕获能力。
 
@@ -176,6 +176,7 @@ pnpm run build   # tsdown 三 bundle：lib/index.js + lib/client.js + bin/ego-ca
 - **宿主可靠性（Linux）**：未合并的社区 PR，跨 CLI 调用间可能丢 tab/空间状态；插件已内置防御，简单流程稳定，复杂流程可能需重试。
 - **登录态持久化**：Chrome 运行期 Cookie 仅优雅关闭时落盘，强杀重启需重登。
 - 输出 schema 为宽松 `additionalProperties: true`，客户端以实际返回值为准。
+- **落后上游**：本 fork 的上游 `Fisfzy/dsh-ego-browser` 已前进到 **v0.8.5**（`git rev-list` 计落后 35 个提交，含 login cookie 导入、空闲回收、看板 i18n 等功能）。本 fork 未合并这些提交，当前分支只含 rc.1/rc.2 兼容适配与上述缺陷修复，两者功能面不重叠。
 
 ## 许可与署名
 

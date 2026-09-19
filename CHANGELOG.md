@@ -2,6 +2,13 @@
 
 所有对用户可见的变更集中在各版本号下。格式遵循 [Keep a Changelog](https://keepachangelog.com/)，版本语义遵循 [SemVer](http://semver.org/)。
 
+## [0.8.7] - 2026-09-19 — DSH 0.1.5-rc.2 验证
+
+### 变更
+- **依赖解析刷新到 0.1.5-rc.2**：在 0.1.5-rc.2 的实际 SDK 类型下重跑 `pnpm typecheck`（host + client）、全量 vitest（15 个文件 / 91 项全绿）与 `tsdown` 构建并重打 tarball。源码无需改动——本插件使用的 API 面没有破坏性变更。
+- `package.json` 的 `engines.dsh`、6 个 peerDependencies 与 devDependencies 声明**保持 `^0.1.5-rc.1` 不变**：semver 预发布匹配只在 `[major,minor,patch]` 相同时生效，`^0.1.5-rc.1` 已同时匹配 `0.1.5-rc.1` 与 `0.1.5-rc.2`（上一轮从 `>=0.1.2-rc.1` 收紧正是因为三元组不同）。保持该范围让本版本在 rc.1 宿主上同样可装，插件可先于 harness 升级部署。
+- README「已知限制」补记 fork 与上游的关系：上游 `Fisfzy/dsh-ego-browser` 已到 v0.8.5，本 fork 落后 35 个提交且未合并。
+
 ## [0.8.6] - 2026-09-11 — DSH 0.1.5-rc.1 兼容 + Windows 编码探测修复
 
 ### 变更
