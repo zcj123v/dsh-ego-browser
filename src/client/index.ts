@@ -22,12 +22,17 @@ declare function require(id: string): any
 		//   PANEL_CSS + ICON_*        : 样式与图标（顶部常量区）
 		//   apply()                   : 入口，挂载面板/浮球/事件
 		//   makeZoomImage / browserXY : 主视图缩放 + 坐标逆映射
-		//   makeDraggable / snapPanelToFab : 球/窗口各自拖动 + 打点吸附
-		//   renderSpaces / applyFrame / openStream : 轮询 + SSE 实时帧
-		//   maybeShowLoginGuide / maybeShowCaptchaGuide : 登录/人机验证提醒条
-		// 注意：本前端是单文件（受 DSH 注入机制限制），不要在页面上拆文件；
-		//   数据源 = 轮询 /api/ego/spaces + SSE /api/ego/stream(实时帧)。
+//   makeDraggable / snapPanelToFab : 球/窗口各自拖动 + 打点吸附
+//   makeResizable / applyPanelSize : 右下角手柄缩放 + localStorage 记忆
+//   renderSpaces / applyFrame / openStream : 轮询 + SSE 实时帧
+//   maybeShowLoginGuide / maybeShowCaptchaGuide : 登录/人机验证提醒条
+// 注意：本前端是单文件（受 DSH 注入机制限制），不要在页面上拆文件；
+//   源码级 ./panel-size 等纯模块例外——tsdown 会打平进单个 lib/client.js，
+//   浏览器仍只加载一个文件；数据源 = 轮询 /api/ego/spaces + SSE /api/ego/stream(实时帧)。
 		// #endregion
+
+// Resize bounds + persistence rules; bundled flat into this artifact by tsdown.
+import { clampPanelSize, parsePanelSize, PANEL_DEFAULT_W, PANEL_MIN_W, HISTORY_EXTRA_W } from './panel-size'
 
 		// ── Settings card dependencies ───────────────────────────────────
 		// Required up-front so the settings card + watch panel share the same
@@ -179,6 +184,7 @@ declare function require(id: string): any
 			refresh: 'Refresh',
 			backToLive: '← Back to live',
 			dragHint: 'Drag to move panel',
+			resizeHint: 'Drag to resize · double-click to reset',
 			loginTitle: 'Log in in the agent browser window (use the Pop out window button in this panel if you cannot find it)',
 			loginBtn: 'Logged in, save',
 			loginSaving: 'Saving…',
@@ -225,6 +231,7 @@ declare function require(id: string): any
 			refresh: '刷新',
 			backToLive: '← 返回实时',
 			dragHint: '拖动移动面板',
+			resizeHint: '拖拽缩放面板 · 双击复位',
 			loginTitle: '需要账号登录时，请在 agent 浏览器窗口完成登录（找不到窗口就点本面板的「弹出窗口」按钮把它抬到最前）。',
 			loginBtn: '已登录，保存',
 			loginSaving: '保存中…',
@@ -1234,7 +1241,19 @@ declare function require(id: string): any
 }
 #dsh-ego-panel.dsh-ego-panel-open { opacity: 1; pointer-events: auto; transform: none; }
 #dsh-ego-panel[hidden] { display: none; }
-#dsh-ego-panel.open-drawer { width: 640px; }
+/* Drawer width is computed by applyPanelSize() (user width + HISTORY_EXTRA_W),
+   so no fixed .open-drawer width here anymore. */
+
+/* Resize grip: bottom-right corner. Two hairline diagonals; plain wheel/keys
+   are untouched, pointer capture keeps the drag on the handle only. */
+#dsh-ego-resize { position: absolute; right: 2px; bottom: 2px; width: 16px; height: 16px;
+  cursor: nwse-resize; touch-action: none; z-index: 6; opacity: .55; border-radius: 0 0 10px 0;
+  background: linear-gradient(135deg, transparent 0 46%, rgba(245,245,247,.55) 46% 52%,
+    transparent 52% 64%, rgba(245,245,247,.55) 64% 70%, transparent 70% 82%,
+    rgba(245,245,247,.55) 82% 88%, transparent 88% 100%); }
+#dsh-ego-resize:hover, #dsh-ego-resize:active { opacity: 1; }
+#dsh-ego-panel.dsh-ego-resizing { transition: none; }
+#dsh-ego-panel.dsh-ego-resizing #dsh-ego-head { cursor: default; }
 
 /* FAB press / open feedback */
 #dsh-ego-fab:active { transform: scale(.95); }
@@ -1533,6 +1552,7 @@ declare function require(id: string): any
 						</aside>
 					</div>
 					<div class="dsh-ego-off">${wt('liveView')} · ${wt('realtime')} · ${ICON_CLOCK} ${wt('historyShow')}</div>
+					<div id="dsh-ego-resize" title="${wt('resizeHint')}"></div>
 				`
 
 				const fab = document.createElement('button')
@@ -1612,6 +1632,26 @@ declare function require(id: string): any
 				// the worker/host is transiently unreachable).
 				let lastList = []
 
+				// ── user-resized panel size, persisted per browser ─────────────────
+				// panelWidthUser/panelHeightUser of 0 mean "factory default": width
+				// falls back to the CSS 408px and the height stays content-driven.
+				// While the history drawer is open the width is user + HISTORY_EXTRA_W
+				// (clamped), replacing the old fixed 640px.
+				const SIZE_KEY = 'dsh.ego.watch.panelSize'
+				let panelWidthUser = 0
+				let panelHeightUser = 0
+				const applyPanelSize = () => {
+					const vw = window.innerWidth, vh = window.innerHeight
+					const base = panelWidthUser > 0 ? panelWidthUser : PANEL_DEFAULT_W
+					const wanted = base + (historyOpen ? HISTORY_EXTRA_W : 0)
+					// Width always clamps (drawer extra included); height only when
+					// the user has resized it away from content-driven sizing.
+					const h = panelHeightUser > 0 ? panelHeightUser : 0
+					const size = clampPanelSize(wanted, h, vw, vh)
+					panel.style.width = size.w + 'px'
+					panel.style.height = panelHeightUser > 0 ? size.h + 'px' : ''
+				}
+
 				// Toggle the history drawer (side panel).
 				const setHistory = (open) => {
 					historyOpen = open
@@ -1619,6 +1659,7 @@ declare function require(id: string): any
 					panel.classList.toggle('open-drawer', open)
 					historyBtn.classList.toggle('off', !open)
 					;(historyBtn as HTMLElement).title = open ? wt('historyHide') : wt('historyShow')
+					applyPanelSize()
 					if (open) renderHistory(lastList)
 				}
 
@@ -2371,7 +2412,9 @@ declare function require(id: string): any
 				 *  the top edge), clamped inside the viewport. */
 				const snapPanelToFab = () => {
 					const vw = window.innerWidth, vh = window.innerHeight
-					const pw = panel.classList.contains('open-drawer') ? 640 : PANEL_W
+					// Actual rendered width (user-resized or drawer-widened); the CSS
+					// default only matters before the panel has ever been laid out.
+					const pw = panel.offsetWidth > 0 ? panel.offsetWidth : PANEL_W
 					const ph = panel.offsetHeight > 0 ? panel.offsetHeight : Math.min(Math.round(vh * 0.7), 520)
 					// Panel's right edge hugs the ball's left edge.
 					let px = pos.x + FAB_W - pw
@@ -2433,6 +2476,65 @@ declare function require(id: string): any
 				// Ball drags the ball; the panel header drags the panel. Independent.
 				makeDraggable(fab, 'fab')
 				makeDraggable(panel.querySelector('#dsh-ego-head'), 'panel')
+
+				// ── panel resize: bottom-right grip ─────────────────────────────
+				// Drag sets width+height live (pointer capture, clamped to the
+				// viewport rules in panel-size.ts) and persists on release. The
+				// stored width is the *base* (drawer closed); double-click clears
+				// both dimensions and the stored entry, restoring the factory
+				// 408px width and the content-driven height.
+				const makeResizable = (handle) => {
+					let sx = 0, sy = 0, bw = 0, bh = 0, active = false
+					const down = (e) => {
+						if (e.button !== 0) return
+						active = true
+						sx = e.clientX; sy = e.clientY
+						bw = panel.offsetWidth; bh = panel.offsetHeight
+						try { handle.setPointerCapture(e.pointerId) } catch {}
+						panel.classList.add('dsh-ego-resizing')
+						e.preventDefault()
+					}
+					const move = (e) => {
+						if (!active) return
+						const extra = historyOpen ? HISTORY_EXTRA_W : 0
+						const next = clampPanelSize(bw + (e.clientX - sx) + extra, bh + (e.clientY - sy), window.innerWidth, window.innerHeight)
+						// Keep the stored base width meaningful with the drawer open:
+						// the grip still widens the panel as a whole, we just remember
+						// the part that survives closing the drawer (>= min width).
+						panelWidthUser = Math.max(PANEL_MIN_W, next.w - extra)
+						panelHeightUser = next.h
+						panel.style.width = next.w + 'px'
+						panel.style.height = next.h + 'px'
+					}
+					const up = (e) => {
+						if (!active) return
+						active = false
+						panel.classList.remove('dsh-ego-resizing')
+						try { handle.releasePointerCapture(e.pointerId) } catch {}
+						if (panelWidthUser > 0 || panelHeightUser > 0) {
+							try { localStorage.setItem(SIZE_KEY, JSON.stringify({ w: panelWidthUser, h: panelHeightUser })) } catch {}
+						}
+					}
+					const dbl = () => {
+						panelWidthUser = 0
+						panelHeightUser = 0
+						try { localStorage.removeItem(SIZE_KEY) } catch {}
+						applyPanelSize()
+					}
+					handle.addEventListener('pointerdown', down)
+					handle.addEventListener('pointermove', move)
+					handle.addEventListener('pointerup', up)
+					handle.addEventListener('pointercancel', up)
+					handle.addEventListener('dblclick', dbl)
+				}
+				makeResizable(panel.querySelector('#dsh-ego-resize'))
+				// Restore a persisted size once, before the panel is ever shown.
+				{
+					let raw: string | null = null
+					try { raw = localStorage.getItem(SIZE_KEY) } catch {}
+					const saved = parsePanelSize(raw, window.innerWidth, window.innerHeight)
+					if (saved) { panelWidthUser = saved.w; panelHeightUser = saved.h; applyPanelSize() }
+				}
 
 				const setOpen = (open) => {
 					if (open) {

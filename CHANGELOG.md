@@ -25,6 +25,21 @@
 - **尚未在真实 DSH 宿主上做安装/工具调用验收**（同 0.9.0 轮诚实标注）；节点验收随 fleet 0.2.0-rc.2 部署进行，结果记根仓当日日志。`engines.dsh` 保持 `^0.1.5-rc.1`——严格 semver 下不匹配 0.2.0-rc.2（三元组不同），fleet 经 file: tarball 安装不受阻断（0.9.0 已在该宿主形态运行，先例沿用）。
 
 
+## [0.8.6-fix2] - 2026-10-12 — 观察窗面板自由缩放（fork 功能新增）
+
+### 新增
+- **观察面板右下角拖拽手柄**：自由调整宽高——宽 `360px ~ min(90vw, 1200px)`、高 `280px ~ 78vh`（保持既有 78vh 上限语义），拖拽实时跟随（pointer capture），松开写入 `localStorage['dsh.ego.watch.panelSize']`，刷新/重开后恢复；视口缩小后恢复时按当前视口 clamp 而不是丢弃。**双击手柄复位**：清除存储并回到默认（宽 408px、高度自适应内容）。
+- **历史侧栏宽度叠加**：打开侧栏时面板宽 = 用户宽 + 232（侧栏 224 + 间距），替代原写死的 `640px`；关闭回落用户宽；叠加后仍受同一 clamp 上限约束。`snapPanelToFab` 的吸附宽度改用实际渲染宽（`offsetWidth`），适配任意用户尺寸。
+
+### 设计要点
+- 点击坐标映射 `browserXY` 不动：它按 `getBoundingClientRect()` 实时换算，面板任意尺寸下点击精度不受影响。
+- 尺寸规则抽为纯模块 `src/client/panel-size.ts`（`clampPanelSize`/`parsePanelSize`），tsdown 打平进单个 `lib/client.js`（浏览器仍只加载一个文件，遵守「单文件注入」约束）。
+- 弹出动画 transition 仅 opacity/transform/visibility，不涉宽高，拖拽无需停动画；拖拽中仅加 `.dsh-ego-resizing` 关闭 transition 以防万一。
+
+### 验证
+- `pnpm typecheck`（host + client）通过；`pnpm test` **21 文件 / 147 passed / 5 skipped**（新增 `tests/panel-size.test.ts` 9 项：clamp 边界/取整、drawer 叠加、parse 合法/非法/越界-clamp/非有限数拒绝）；`pnpm build` 重生成产物（client 467.95 kB）。
+- `.6` 实机验收随部署进行（拖拽跟手/记忆/双击复位/drawer 回落/zoom 后点击精度）。
+
 ## [上游 v0.8.6] - 2026-09-28 — 登录态导入安全加固 + DSH 0.1.7 设置适配 + 人机验证误报修复
 
 ### 安全
