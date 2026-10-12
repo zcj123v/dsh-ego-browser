@@ -13,7 +13,7 @@
 
 > **仓库**：`github.com/Fisfzy/ego-browser`｜版本历史见 [CHANGELOG.md](CHANGELOG.md)｜详情页：[dshfind](https://dshfind.com/zh/plugins/Fisfzy/ego-browser)
 
-**DSH 版本支持**：本版本 **v0.9.0** 针对 **DeepSeek Harness `0.1.5-rc.2`** 验证，并已**合并上游 `Fisfzy/ego-browser` 至 v0.8.5**（此前本 fork 落后 35 个提交、功能面不重叠；本次已全部并入，逐条见 [CHANGELOG.md](CHANGELOG.md)）。`engines.dsh` 与 peer 依赖声明保持 `^0.1.5-rc.1`——semver 预发布规则下该范围同时匹配 `0.1.5-rc.1` 与 `0.1.5-rc.2`，因此本版本在 rc.1 宿主上同样可装，便于插件先于 harness 升级部署。已在 0.1.5-rc.2 的实际 SDK 类型下完成 `pnpm typecheck`（host + client）、全量 vitest（91 项）与 `tsdown` 构建；**尚未在升级后的真实宿主上做安装/工具调用验收**，0.8.3 记录的 0.1.2-rc.1 + Windows + web profile 实机验收不能直接代表本版本）。**0.1.2-rc.1 ～ 0.1.3-alpha.x 宿主请使用 v0.8.5**（其 `engines.dsh` 地板为 `>=0.1.2-rc.1`）；**0.1.0-rc.x / 0.1.1-rc.x 宿主请使用 v0.8.0 及更早版本**。v0.8.6 → v0.8.7 没有源码改动：刷新依赖解析到 0.1.5-rc.2 后重新验证，本插件使用的 API 面（`ctx.settings.register` + scope `watch`、`ctx.slots.inject/register`、`ctx.locale.register`、client 侧 `createSnapshotStore`、`ctx.subprocess`、`webServer`）无破坏性变更。此前 0.8.3 的适配点仍然有效：client 运行时改名（`@deepseek-ai/dsh-client-store`）、client 模块注册 id 与装载行名按声明包名、`dsh.client.inject` 仅声明真实模块图行、`webServer` 以嵌套注入交付（可选服务），并同步侧边栏 Tab（dsh-better-sidebar）模式。
+**DSH 版本支持**：本版本 **v0.8.6-fix1**（fork 版本号规则 `<上游版本>-fix<N>` 的首个版本，见 CHANGELOG「版本号」节）已**合并上游 `Fisfzy/ego-browser` 至 v0.8.6**（#61 cookie 库数据丢失修复、DSH 0.1.7+ settings 运行时探测适配、#62 captcha 误报修复、`disableFrameRelay` 开关；逐条见 [CHANGELOG.md](CHANGELOG.md)）。`engines.dsh` 与 peer 依赖声明保持 `^0.1.5-rc.1`——semver 预发布规则下该范围同时匹配 `0.1.5-rc.1` 与 `0.1.5-rc.2`，因此本版本在 rc.1 宿主上同样可装，便于插件先于 harness 升级部署。已在 0.1.5-rc.2 的实际 SDK 类型下完成 `pnpm typecheck`（host + client）、全量 vitest（20 文件 / 138 passed / 5 skipped）与 `tsdown` 构建；**真实宿主验收随 fleet 0.2.0-rc.2 部署进行**（settings 面走上游 v0.8.6 的运行时探测：无 `register` 的 0.1.7+ 宿主自动切 forms/插件页行配置分支）。**0.1.2-rc.1 ～ 0.1.3-alpha.x 宿主请使用 v0.8.5**（其 `engines.dsh` 地板为 `>=0.1.2-rc.1`）；**0.1.0-rc.x / 0.1.1-rc.x 宿主请使用 v0.8.0 及更早版本**。v0.8.6 → v0.8.7 没有源码改动：刷新依赖解析到 0.1.5-rc.2 后重新验证，本插件使用的 API 面（`ctx.settings.register` + scope `watch`、`ctx.slots.inject/register`、`ctx.locale.register`、client 侧 `createSnapshotStore`、`ctx.subprocess`、`webServer`）无破坏性变更。此前 0.8.3 的适配点仍然有效：client 运行时改名（`@deepseek-ai/dsh-client-store`）、client 模块注册 id 与装载行名按声明包名、`dsh.client.inject` 仅声明真实模块图行、`webServer` 以嵌套注入交付（可选服务），并同步侧边栏 Tab（dsh-better-sidebar）模式。
 ### 版本兼容矩阵
 
 | 依赖 | 最低版本 | 推荐版本 | 说明 |
@@ -22,7 +22,7 @@
 | **dsh-better-sidebar** | `0.12.2`（可选） | `≥ 0.17.1` | 未安装时自动回退浮动观察球；`< 0.12.2` 可运行但外部链接拦截（`urlTarget`）静默降级 |
 | **Node.js** | `22` | — | harness 环境自带 |
 
-**DSH 全版本适配说明**：本版本 v0.9.0 的源码已通过审计确认与 DSH `0.1.2-rc.1` 至 `0.1.5-rc.2` 全部发布版本兼容（`defineTool`、`ctx.tools.register`、`ctx.subprocess.spawn`、`ctx.webServer.register`、`ctx.inject`、`ModuleLoader` CJS factory、`cordis.patch.yml` 等核心 API 在 v0.1.0-rc.7 → v0.1.5-rc.2 无破坏性变更）。但本 fork 的 `engines.dsh` 声明地板为 `^0.1.5-rc.1`，低于该地板的宿主请使用 v0.8.5 或更早的 fork 版本；0.1.2-alpha.x 系列按声明可装但未实测。
+**DSH 全版本适配说明**：本版本 v0.8.6-fix1 的源码沿用 v0.9.0 审计结论并与上游 v0.8.6 变更合并复核：与 DSH `0.1.2-rc.1` 至 `0.1.5-rc.2` 全部发布版本兼容（`defineTool`、`ctx.tools.register`、`ctx.subprocess.spawn`、`ctx.webServer.register`、`ctx.inject`、`ModuleLoader` CJS factory、`cordis.patch.yml` 等核心 API 在 v0.1.0-rc.7 → v0.1.5-rc.2 无破坏性变更）。但本 fork 的 `engines.dsh` 声明地板为 `^0.1.5-rc.1`，低于该地板的宿主请使用 v0.8.5 或更早的 fork 版本；0.1.2-alpha.x 系列按声明可装但未实测。
 
 **dsh-better-sidebar 适配说明**：ego-browser 通过 `ctx.betterSidebar` 服务（try-catch 防御性获取）注册侧边栏 Tab 并监听外部链接。关键 API 引入版本：
 
@@ -140,6 +140,10 @@ dshx list                                                # 应显示：[on] ego-
 ```
 
 观察窗设置中可选 `captureBackend=auto|cdp|ffmpeg`（默认 `auto`，当前解析为 CDP）、画质档位、CDP FPS/JPEG 质量/最大宽度，以及 FFmpeg FPS/最大宽度/码率/编码器/自定义路径。插件先检测自定义路径、系统 PATH 和托管缓存；检测到兼容 FFmpeg 前，设置页禁止选择 FFmpeg，并提供固定版本的一键下载。GitHub 下载可用 `githubMirror` 替换 `https://github.com`，例如 `https://gh-proxy.com/github.com`。FFmpeg 码率范围为 500-20000 kbps，低/平衡/高档默认 2000/4000/8000 kbps。
+
+其他开关：`isolateSpaces`（任务空间沙盒隔离，默认关）、`idleTimeoutMin`（空闲 N 分钟后自动回收后台浏览器，默认 0=关）、`disableFrameRelay`（**禁用画面回传**，默认关）。
+
+**禁用画面回传（`disableFrameRelay`）**：开启后插件不再回传任何画面——不启动 ego-cast worker（因此不会做 CDP/WGC 屏幕采集、不会 ffmpeg 拉流与 fMP4 封装），`/api/ego/stream`、`/api/ego/video` 及 worker 相关路由改为返回 `{"ok":false,"reason":"frame relay disabled"}`，观察窗不再建立任何拉流连接并显示禁用态提示。`ego_*` 工具本身完全不受影响（浏览器照常开，快照/点击/输入/截图照常工作）。开关是配置项，保存后立即生效：正在跑的 worker 会被停掉，重新开启后自动恢复。
 
 无需宿主侧任何配置：`resolveEgoEnv` 自动探测 root / 无显示器并兜底。观察窗 host 路由（`/api/ego/spaces` 等）仅在有 HTTP server 时注册，headless 是安全 no-op。
 

@@ -80,6 +80,12 @@ declare function require(id: string): any
 			isolateSpacesOn: 'Enabled (isolated memory sandbox)',
 		idleTimeoutMin: 'Idle auto-stop (minutes)',
 		idleTimeoutMinHint: 'Stop the backing browser after N minutes without an ego_* call (0 = off). It cold-starts on the next call (~2-4s). Watching the panel does not count as activity.',
+		disableFrameRelay: 'Disable live frame relay',
+		disableFrameRelayHint: 'No picture is relayed at all: no ego-cast worker, no CDP/WGC screencast capture, no ffmpeg pull, and the watch panel opens no stream. ego_* tools keep working normally.',
+		disableFrameRelayOff: 'Off (live view enabled)',
+		disableFrameRelayOn: 'On (no picture pushed to this page)',
+		relayDisabledTitle: 'Live frame relay is disabled',
+		relayDisabledBody: 'Turn off "Disable live frame relay" in Settings → Plugins → ego-browser to see the live view here.',
 		minUnit: 'min',
 		loginImportTitle: 'Import logins from system browser',
 		loginImportIntro: 'Copy login cookies from your daily Chrome/Edge/Brave into the agent browser (CDP passthrough — no offline decryption). Probe first, then import with an explicit domain list.',
@@ -114,6 +120,12 @@ declare function require(id: string): any
 			isolateSpacesOn: '开启（严格沙盒隔离，任务结束不落盘）',
 		idleTimeoutMin: '空闲自动回收（分钟）',
 		idleTimeoutMinHint: 'N 分钟没有任何 ego_* 调用后自动关闭后台浏览器进程（0 = 关闭）。下次调用自动冷启动（约 2-4 秒）。观看观察窗不算活动。',
+		disableFrameRelay: '禁用画面回传',
+		disableFrameRelayHint: '完全不回传画面：不启动 ego-cast worker，不做 CDP/WGC 屏幕采集与 ffmpeg 拉流，观察窗不再建立任何拉流连接。ego_* 工具本身照常可用。',
+		disableFrameRelayOff: '关闭（保留实时画面）',
+		disableFrameRelayOn: '开启（不回传任何画面）',
+		relayDisabledTitle: '画面回传已禁用',
+		relayDisabledBody: '在「设置 → 插件 → ego-browser」中关闭「禁用画面回传」后，这里才会显示实时画面。',
 		minUnit: '分钟',
 		loginImportTitle: '从系统浏览器导入登录态',
 		loginImportIntro: '把你日常 Chrome/Edge/Brave 里的登录 cookie 复制进 agent 浏览器（CDP 透传，不做离线解密）。建议先「探测」看可导入项，再按域名导入。',
@@ -167,7 +179,7 @@ declare function require(id: string): any
 			refresh: 'Refresh',
 			backToLive: '← Back to live',
 			dragHint: 'Drag to move panel',
-			loginTitle: 'Log in via the ego-lite agent browser window on your desktop',
+			loginTitle: 'Log in in the agent browser window (use the Pop out window button in this panel if you cannot find it)',
 			loginBtn: 'Logged in, save',
 			loginSaving: 'Saving…',
 			loginSaved: 'Saved {n} sessions',
@@ -175,7 +187,7 @@ declare function require(id: string): any
 			loginFailed: 'Save failed',
 			loginDismiss: 'Dismiss',
 			captchaTitle: '⚠️ CAPTCHA detected',
-			captchaHint: 'Complete verification in the ego-lite agent browser window; the agent will continue.',
+			captchaHint: 'Complete the verification in the agent browser window (use the Pop out window button above to bring it to the front); the agent will continue.',
 			captchaDismiss: 'Dismiss',
 			hintReset: 'Reset · scroll to pan · Ctrl+scroll to zoom · double-click to reset',
 			hintPan: 'Ctrl+scroll to zoom · Ctrl+drag to pan · double-click to reset',
@@ -187,6 +199,8 @@ declare function require(id: string): any
 			fabTitle: 'Agent Browser live view',
 			settingsTitle: 'Show settings',
 			settingsHide: 'Hide settings',
+			relayDisabledTitle: 'Live frame relay is disabled',
+			relayDisabledBody: 'Turn off “Disable live frame relay” in Settings → Plugins → ego-browser to see the live view here. No stream is opened meanwhile.',
 		}
 		var watchZh = {
 			title: 'Agent 浏览器',
@@ -211,7 +225,7 @@ declare function require(id: string): any
 			refresh: '刷新',
 			backToLive: '← 返回实时',
 			dragHint: '拖动移动面板',
-			loginTitle: '需要账号登录时，请到桌面上那个 「ego lite — agent」 Chrome 窗口完成登录。',
+			loginTitle: '需要账号登录时，请在 agent 浏览器窗口完成登录（找不到窗口就点本面板的「弹出窗口」按钮把它抬到最前）。',
 			loginBtn: '已登录，保存',
 			loginSaving: '保存中…',
 			loginSaved: '已保存 {n} 条会话',
@@ -219,7 +233,7 @@ declare function require(id: string): any
 			loginFailed: '保存失败',
 			loginDismiss: '关闭提示',
 			captchaTitle: '⚠️ 检测到人机验证',
-			captchaHint: '请在桌面那个 「ego lite — agent」 浏览器窗口手动完成验证，agent 会继续。',
+			captchaHint: '请在 agent 浏览器窗口手动完成验证（点上方「弹出窗口」按钮可把窗口抬到最前）；agent 会继续。',
 			captchaDismiss: '关闭提示',
 			hintReset: '已复位 · 滚轮滚动页面 · Ctrl+滚轮缩放 · 双击复位',
 			hintPan: 'Ctrl+滚轮缩放 · Ctrl+拖动平移 · 双击复位',
@@ -231,6 +245,8 @@ declare function require(id: string): any
 			fabTitle: 'Agent 浏览器实时视图',
 			settingsTitle: '展开设置',
 			settingsHide: '收起设置',
+			relayDisabledTitle: '画面回传已禁用',
+			relayDisabledBody: '在「设置 → 插件 → ego-browser」中关闭「禁用画面回传」后，这里才会显示实时画面。禁用期间不会建立任何拉流连接。',
 		}
 		var watchDict = { en: watchEn, zh: watchZh }
 		function wt(key, params = undefined) {
@@ -240,13 +256,46 @@ declare function require(id: string): any
 			return text
 		}
 
+		// ── Live frame relay switch (settings: disableFrameRelay) ───────────
+		// The host owns the switch; this module-level mirror is what keeps the
+		// client honest about it: while the relay is OFF the panel opens NO pull
+		// connection at all (no EventSource on /api/ego/stream, no /api/ego/video
+		// fetch) and renders an explicit disabled state instead of reconnect-looping.
+		// The value arrives from two places: /ego/api/get|set (the settings card) and
+		// the `frameRelay` flag the host attaches to /api/ego/spaces and
+		// /api/ego/watch/status (the flag the panels read right before connecting).
+		var frameRelayDisabled = false
+		var frameRelayListeners = []
+		function frameRelaySet(disabled) {
+			disabled = disabled === true
+			if (disabled === frameRelayDisabled) return
+			frameRelayDisabled = disabled
+			for (var i = 0; i < frameRelayListeners.length; i++) {
+				try { frameRelayListeners[i](disabled) } catch (e) {}
+			}
+		}
+		function frameRelaySubscribe(cb) {
+			frameRelayListeners.push(cb)
+			return function () {
+				var i = frameRelayListeners.indexOf(cb)
+				if (i >= 0) frameRelayListeners.splice(i, 1)
+			}
+		}
+		// Host-reported relay state on a status payload. Returns true when the relay
+		// is off (and mirrors it into the module flag).
+		function frameRelayOff(status) {
+			if (!status || typeof status !== 'object' || status.frameRelay !== false) return false
+			frameRelaySet(true)
+			return true
+		}
+
 		// ── Settings card: store ──────────────────────────────────────────
 		function initialSettingsState() {
 			return {
 				status: 'idle',        // 'idle' | 'loading' | 'ready'
 				available: false,      // true after a successful /ego/api/get
 				writable: false,       // false when settings service is absent
-				draft: { isolateSpaces: false, idleTimeoutMin: '0', chromePath: '', captureBackend: 'auto', streamProfile: 'balanced', cdpFps: '20', cdpQuality: '55', cdpMaxWidth: '960', cdpBackstopIntervalMs: '3000', ffmpegFps: '20', ffmpegMaxWidth: '1280', ffmpegBitrateKbps: '4000', ffmpegEncoder: 'auto', ffmpegPath: '', githubMirror: '', egoCliArgs: '', chromeArgs: '' },
+				draft: { isolateSpaces: false, disableFrameRelay: false, idleTimeoutMin: '0', chromePath: '', captureBackend: 'auto', streamProfile: 'balanced', cdpFps: '20', cdpQuality: '55', cdpMaxWidth: '960', cdpBackstopIntervalMs: '3000', ffmpegFps: '20', ffmpegMaxWidth: '1280', ffmpegBitrateKbps: '4000', ffmpegEncoder: 'auto', ffmpegPath: '', githubMirror: '', egoCliArgs: '', chromeArgs: '' },
 				ffmpegStatus: { state: 'checking', canDownload: false, canSelectFfmpeg: false },
 				dirty: false,
 				applyState: { kind: 'idle' }, // 'idle' | 'saving' | 'saved' | 'error'
@@ -287,6 +336,8 @@ declare function require(id: string): any
 				var config = parsed.value.config || {}
 				var ffmpegStatus = parsed.value.ffmpegStatus || { state: 'missing', canDownload: false, canSelectFfmpeg: false }
 				self.loaded = true
+				// Mirror the host switch so the watch panel reacts immediately.
+				frameRelaySet(config.disableFrameRelay)
 				self.staged.clear()
 				self.store.update(function (s) {
 					s.status = 'ready'
@@ -295,6 +346,7 @@ declare function require(id: string): any
 			s.draft = {
 				isolateSpaces: config.isolateSpaces === true || config.isolateSpaces === 'true' || config.isolateSpaces === 1 || config.isolateSpaces === '1',
 				idleTimeoutMin: String(config.idleTimeoutMin ?? 0),
+				disableFrameRelay: config.disableFrameRelay === true || config.disableFrameRelay === 'true' || config.disableFrameRelay === 1 || config.disableFrameRelay === '1',
 				chromePath: config.chromePath || '',
 				captureBackend: config.captureBackend === 'ffmpeg' && !ffmpegStatus.canSelectFfmpeg ? 'cdp' : (config.captureBackend || 'auto'), streamProfile: config.streamProfile || 'balanced',
 				cdpFps: String(config.cdpFps ?? 20), cdpQuality: String(config.cdpQuality ?? 55), cdpMaxWidth: String(config.cdpMaxWidth ?? 960), cdpBackstopIntervalMs: String(config.cdpBackstopIntervalMs ?? 3000),
@@ -414,12 +466,15 @@ declare function require(id: string): any
 				}
 				var config = parsed.value.config || {}
 				var ffmpegStatus = parsed.value.ffmpegStatus || self.store.getSnapshot().ffmpegStatus
+				// A saved switch applies to the live panel at once — no reload.
+				frameRelaySet(config.disableFrameRelay)
 				self.staged.clear()
 				self.store.update(function (s) {
 				s.applyState = { kind: 'saved' }
 			s.draft = {
 				isolateSpaces: config.isolateSpaces === true || config.isolateSpaces === 'true' || config.isolateSpaces === 1 || config.isolateSpaces === '1',
 				idleTimeoutMin: String(config.idleTimeoutMin ?? 0),
+				disableFrameRelay: config.disableFrameRelay === true || config.disableFrameRelay === 'true' || config.disableFrameRelay === 1 || config.disableFrameRelay === '1',
 				chromePath: config.chromePath || '',
 				captureBackend: config.captureBackend === 'ffmpeg' && ffmpegStatus && !ffmpegStatus.canSelectFfmpeg ? 'cdp' : (config.captureBackend || 'auto'), streamProfile: config.streamProfile || 'balanced',
 				cdpFps: String(config.cdpFps ?? 20), cdpQuality: String(config.cdpQuality ?? 55), cdpMaxWidth: String(config.cdpMaxWidth ?? 960), cdpBackstopIntervalMs: String(config.cdpBackstopIntervalMs ?? 3000),
@@ -608,41 +663,19 @@ declare function require(id: string): any
 			)
 		}
 
-		function EgoBrowserCard(props) {
+		function EgoBrowserForm(props) {
 			var t = props.t
 			var controller = props.controller
 			var useSnapshot = props.useSnapshot
 			var state = useSnapshot(function (s) { return s })
 			if (state.status === 'idle') void controller.load()
-			var degraded = state.status === 'ready' && !state.available
-			var open = state._open || degraded
 			var applyState = state.applyState || { kind: 'idle' }
 			var saving = applyState.kind === 'saving'
 			var saved = applyState.kind === 'saved'
 			var errorText = applyState.kind === 'error' ? applyState.message : undefined
 
-			var header = h('button', {
-				type: 'button',
-				className: 'dsh-ego-card__header',
-				'aria-expanded': open,
-				'aria-label': t(open ? 'collapse' : 'expand') + ': ' + t('title'),
-				onClick: function () { if (!degraded) controller.toggle() },
-			},
-				h('span', { className: 'dsh-ego-card__head-text' },
-					h('span', { className: 'dsh-ego-card__name' }, t('title')),
-					h('span', { className: 'dsh-ego-card__desc' }, t('intro')),
-				),
-				state.dirty ? h('span', { className: 'dsh-ego-card__pending' }, t('unsaved')) : null,
-				h('span', {
-					className: 'dsh-ego-card__chevron' + (open ? ' dsh-ego-card__chevron--open' : ''),
-					dangerouslySetInnerHTML: { __html: CHEVRON_SVG },
-				}),
-			)
-
 			var body = null
-			if (!open) {
-				body = null
-			} else if (!state.available) {
+			if (!state.available) {
 				body = h('div', { className: 'dsh-ego-card__body' },
 					h('p', { className: 'dsh-ego-card__notice', role: 'status' }, t('namespaceUnavailable')),
 					h('div', { className: 'dsh-ego-card__footer' },
@@ -677,6 +710,18 @@ declare function require(id: string): any
 							],
 							disabled: busy,
 							onEdit: function (v) { controller.edit('isolateSpaces', v === 'true') },
+						}),
+						h(SettingsField, {
+							id: 'plugin-config-ego-browser-disableframerelay',
+							label: t('disableFrameRelay'),
+							hint: t('disableFrameRelayHint'),
+							value: state.draft.disableFrameRelay ? 'true' : 'false',
+							options: [
+								{ value: 'false', label: t('disableFrameRelayOff') },
+								{ value: 'true', label: t('disableFrameRelayOn') },
+							],
+							disabled: busy,
+							onEdit: function (v) { controller.edit('disableFrameRelay', v === 'true') },
 						}),
 						h(SettingsField, { id: 'plugin-config-ego-browser-idletimeout', label: t('idleTimeoutMin'), hint: t('idleTimeoutMinHint'), value: state.draft.idleTimeoutMin, numeric: true, narrow: true, unit: t('minUnit'), min: 0, max: 1440, step: 1, disabled: busy, onEdit: function (v) { controller.edit('idleTimeoutMin', v) } }),
 						h(SettingsField, {
@@ -736,9 +781,201 @@ declare function require(id: string): any
 				)
 			}
 
+			return body
+		}
+
+		/**
+		 * 设置分区卡片（DSH <= 0.1.6 的 `settings.plugin.item` 视图）：
+		 * 折叠头 + 表单体。0.1.7 起该 slot 退役，此组件仅在宿主仍在声明它时注册。
+		 */
+		function EgoBrowserCard(props) {
+			var t = props.t
+			var controller = props.controller
+			var useSnapshot = props.useSnapshot
+			var state = useSnapshot(function (s) { return s })
+			if (state.status === 'idle') void controller.load()
+			var degraded = state.status === 'ready' && !state.available
+			var open = state._open || degraded
+			var header = h('button', {
+				type: 'button',
+				className: 'dsh-ego-card__header',
+				'aria-expanded': open,
+				'aria-label': t(open ? 'collapse' : 'expand') + ': ' + t('title'),
+				onClick: function () { if (!degraded) controller.toggle() },
+			},
+				h('span', { className: 'dsh-ego-card__head-text' },
+					h('span', { className: 'dsh-ego-card__name' }, t('title')),
+					h('span', { className: 'dsh-ego-card__desc' }, t('intro')),
+				),
+				state.dirty ? h('span', { className: 'dsh-ego-card__pending' }, t('unsaved')) : null,
+				h('span', {
+					className: 'dsh-ego-card__chevron' + (open ? ' dsh-ego-card__chevron--open' : ''),
+					dangerouslySetInnerHTML: { __html: CHEVRON_SVG },
+				}),
+			)
 			return h('li', {
 				className: 'dsh-ego-card' + (open ? ' dsh-ego-card--open' : ''),
-			}, header, open ? body : null)
+			}, header, open ? h(EgoBrowserForm, { t: t, controller: controller, useSnapshot: useSnapshot }) : null)
+		}
+
+		/**
+		 * 插件页的配置视图（DSH 0.1.7+ 的 `plugins.row.config`）：
+		 * `summary` 是行详情缺包描述时的回退；`page` 渲染带保存控件的完整表单。
+		 * 标题、图标与面包屑由页面自绘，所以这里不再画折叠头。
+		 */
+		function EgoBrowserConfigView(props) {
+			if (props.view === 'summary') return props.t('intro')
+			if (props.form) return h(EgoHostConfigForm, { t: props.t, form: props.form })
+			return h(EgoBrowserForm, { t: props.t, controller: props.controller, useSnapshot: props.useSnapshot })
+		}
+
+		// 旧的一次性迁移键：设置页只写规范键，不在宿主表单里暴露。
+		var HOST_FORM_HIDDEN = ['castFpsCap', 'screencastQuality', 'screencastMaxWidth', 'backstopIntervalMs']
+		var HOST_FORM_PLACEHOLDER = {
+			chromePath: 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+			ffmpegPath: 'ffmpeg',
+			githubMirror: 'https://gh-proxy.com/github.com',
+			egoCliArgs: '--sdk-path /path/to/harness.js',
+			chromeArgs: '--disable-features=Translate --window-size=1024,768',
+		}
+
+		/**
+		 * 由宿主 `ConfigPageForm` 驱动的配置表单（DSH 0.1.7+）。值取自
+		 * `form.state.value`（宿主已接受的那一份），保存时把改动过的字段拼成
+		 * `SettingsPathOpView[]` 交给 `form.mutate(ops, revision)` —— 这条路经
+		 * loader 的 volatile 提交，改完立即生效。自家的 `/ego/api/set` 网关在
+		 * 0.1.7 上只会"报告成功但值不变"，所以只在没有 `form` 时回退到它。
+		 */
+		function EgoHostConfigForm(props) {
+			var t = props.t
+			var form = props.form
+			var snap = form.state
+			var useState = React.useState
+			var useEffect = React.useEffect
+			var _draft = useState(null), draft = _draft[0], setDraft = _draft[1]
+			var _busy = useState(false), busy = _busy[0], setBusy = _busy[1]
+			var _result = useState(null), result = _result[0], setResult = _result[1]
+			// 宿主返回的 `state.value` 只是这一行的原始覆盖值（没有 schema 默认值），
+			// 直接用它渲染会漏掉从未改过的设置项。所以再从自家网关取一份「全字段 +
+			// 默认值」把字段集补齐，缺省值由网关（宿主侧 resolveConfig）给出。
+			var _base = useState(null), base = _base[0], setBase = _base[1]
+			var _reload = useState(0), reload = _reload[0], setReload = _reload[1]
+			useEffect(function () {
+				var alive = true
+				fetch('/ego/api/get', {
+					method: 'POST',
+					headers: { 'content-type': 'application/json' },
+					body: '{}',
+				}).then(function (r) { return r.json() }).then(function (json) {
+					if (!alive) return
+					var config = json && json.value && json.value.config
+					if (config) setBase(config)
+				}).catch(function () { /* 网关不可用时只显示宿主已知的字段 */ })
+				return function () { alive = false }
+			}, [reload])
+
+			var hostValues = (snap && snap.value) || {}
+			var values = Object.assign({}, base || {}, hostValues)
+			var ready = !!(snap && (snap.status === 'ready' || base !== null))
+			var writable = !!(snap && snap.writable)
+			var effective = draft === null ? values : draft
+			var keys = Object.keys(values).filter(function (k) { return HOST_FORM_HIDDEN.indexOf(k) === -1 })
+
+			function edit(key, value) {
+				var next = Object.assign({}, effective)
+				next[key] = value
+				setResult(null)
+				setDraft(next)
+			}
+			function changedOps() {
+				var ops = []
+				for (var i = 0; i < keys.length; i++) {
+					var k = keys[i]
+					if (JSON.stringify(effective[k]) !== JSON.stringify(values[k])) ops.push({ op: 'set', path: [k], value: effective[k] })
+				}
+				return ops
+			}
+			function save() {
+				var ops = changedOps()
+				if (ops.length === 0) { setDraft(null); return }
+				setBusy(true)
+				setResult(null)
+				Promise.resolve(form.mutate(ops, snap && snap.revision)).then(function (accepted) {
+					setBusy(false)
+					setDraft(null)
+					setResult({ ok: accepted !== false })
+					setReload(function (n) { return n + 1 })
+				}).catch(function (err) {
+					setBusy(false)
+					setResult({ ok: false, message: err instanceof Error ? err.message : String(err) })
+				})
+			}
+
+			if (!ready) {
+				return h('div', { className: 'dsh-ego-card__body' },
+					h('p', { className: 'dsh-ego-card__notice', role: 'status' },
+						snap && snap.status === 'unavailable' ? t('namespaceUnavailable') : t('saving')),
+				)
+			}
+
+			var fields = keys.map(function (key) {
+				var value = effective[key]
+				var label = t(key)
+				var hint = t(key + 'Hint')
+				var fieldId = 'plugin-config-ego-browser-' + key.toLowerCase()
+				var fieldHint = hint === key + 'Hint' ? undefined : hint
+				if (typeof value === 'boolean') {
+					return h(SettingsField, {
+						id: fieldId, label: label, hint: fieldHint,
+						value: value ? 'true' : 'false',
+						options: [{ value: 'false', label: t('offLabel') }, { value: 'true', label: t('onLabel') }],
+						disabled: busy || !writable,
+						onEdit: function (v) { edit(key, v === 'true') },
+					})
+				}
+				if (typeof value === 'number') {
+					return h(SettingsField, {
+						id: fieldId, label: label, hint: fieldHint,
+						value: String(value), numeric: true, narrow: true,
+						disabled: busy || !writable,
+						onEdit: function (v) { var n = Number(v); edit(key, Number.isFinite(n) ? n : value) },
+					})
+				}
+				return h(SettingsField, {
+					id: fieldId, label: label, hint: fieldHint,
+					value: String(value == null ? '' : value),
+					placeholder: HOST_FORM_PLACEHOLDER[key],
+					disabled: busy || !writable,
+					onEdit: function (v) { edit(key, v) },
+				})
+			})
+
+			var dirty = changedOps().length > 0
+			var status = null
+			if (busy) status = t('saving')
+			else if (result && result.ok) status = t('savedHint')
+			else if (result && result.ok === false) status = result.message || t('saveFailed')
+			else if (!writable) status = t('readOnly')
+			else if (dirty) status = t('unsaved')
+
+			return h('div', { className: 'dsh-ego-card__body' },
+				!writable ? h('p', { className: 'dsh-ego-card__notice', role: 'status' }, t('readOnly')) : null,
+				h('div', { className: 'dsh-ego-card__form' }, fields),
+				h('div', { className: 'dsh-ego-card__footer' },
+					status ? h('p', { className: 'dsh-ego-card__hint', role: 'status' }, status) : null,
+					h('div', { className: 'dsh-ego-card__actions' },
+						h('button', {
+							type: 'button', className: 'dsh-ego-card__btn', disabled: busy || !dirty,
+							onClick: function () { setDraft(null); setResult(null) },
+						}, t('discard')),
+						h('button', {
+							type: 'button', className: 'dsh-ego-card__btn dsh-ego-card__btn--primary',
+							disabled: busy || !dirty || !writable,
+							onClick: save,
+						}, busy ? t('saving') : t('save')),
+					),
+				),
+			)
 		}
 
 		function isFfmpegBusy(state) { return ['checking', 'downloading', 'verifying', 'extracting', 'probing'].includes(state) }
@@ -1187,13 +1424,38 @@ declare function require(id: string): any
 				var dispose = ctx.on('connection/reset', refresh)
 				return function () { dispose() }
 			}, 'ego-browser: settings invalidation')
+			// 配置入口在两个 slot 上各挂一次，由宿主的声明决定哪个真正生效：
+			//   - DSH >= 0.1.7：插件页的行配置页 `plugins.row.config`，键为
+			//     `<包名>#<行 id>`；行 id 取本包 cordis.patch.yml 声明的
+			//     `ego-browser`，即「插件 › dsh-ego-browser › ego-browser 行」。
+			//   - DSH <= 0.1.6：设置 › 插件的 `settings.plugin.item`（折叠卡片）。
+			// `slots.inject` 对未声明的 slot 只是静默等待（声明后才跑回调），
+			// 因此两处注册互不干扰，也无需探测宿主版本。
+			var configFace = { controller: controller, useSnapshot: useSnapshot }
+			// 行配置的键是 `<bundle>#<rowId>`（宿主 config-ledger.rowConfigKey），
+			// 而 bundle 名取的是 profile 的依赖键，随安装方式变化：
+			//   - 本机 junction 安装 → `@dsh-external/ego-browser`（2026-09-23 实测，
+			//     宿主的 [data-plugin-name] 就是它）
+			//   - npm / git 直接依赖 → 包名 `dsh-ego-browser`
+			// 两种都注册：只有匹配上的那个键会让插件页的行变成可导航。
+			ctx.slots.inject('plugins.row.config', function* () {
+				var bundles = ['@dsh-external/ego-browser', 'dsh-ego-browser']
+				for (var bi = 0; bi < bundles.length; bi++) {
+					yield ctx.slots.register({
+						name: 'plugins.row.config',
+						key: bundles[bi] + '#ego-browser',
+						locale: SETTINGS_NS,
+						inject: function () { return configFace },
+					}, EgoBrowserConfigView)
+				}
+			})
 			ctx.slots.inject('settings.plugin.item', function* () {
 				yield ctx.slots.register({
 					name: 'settings.plugin.item',
 					key: SETTINGS_NS,
 					order: 60,
 					locale: SETTINGS_NS,
-					inject: function () { return { controller: controller, useSnapshot: useSnapshot } },
+					inject: function () { return configFace },
 				}, EgoBrowserCard)
 			})
 
@@ -1315,6 +1577,30 @@ declare function require(id: string): any
 				const setTitle = (text) => {
 					const label = titleEl.querySelector('span:last-child')
 					if (label) label.textContent = text
+				}
+
+				// ── relay-disabled state (settings: disableFrameRelay) ─────────────
+				// Explicit "turned off" panel state: no stream, no reconnect loop, and a
+				// message that says where to turn it back on. Never rendered while the relay
+				// is on (the normal empty/thumbnail views take over again).
+				const renderRelayDisabled = () => {
+					if (disposed) return
+					setTitle(wt('title'))
+					body.innerHTML = '<div class="dsh-ego-empty">' + escapeHtml(wt('relayDisabledTitle')) + '<br><span style="font-size:11px;">' + escapeHtml(wt('relayDisabledBody')) + '</span></div>'
+					liveCount = 0
+					fab.classList.remove('dsh-ego-live', 'dsh-ego-busy')
+				}
+				// Drop every pull-stream artefact of this panel (frames, MSE video, leases).
+				const teardownRelay = () => {
+					try { if (sse) sse.close() } catch (e) {}
+					sse = null
+					doConnected = false
+					stopVideo()
+					stopWatch(false)
+					// Reset the capture state too: a stale ffmpeg/streaming state would make
+					// the next render pull a new /api/ego/video connection.
+					captureBackend = 'cdp'; streamGeneration = 0; streamState = 'idle'; streamMessage = ''
+					pageMeta.clear(); frameCache.clear(); lastList = []
 				}
 
 				let disposed = false
@@ -1781,6 +2067,7 @@ declare function require(id: string): any
 					// view — otherwise the standing poll snaps it back to live.
 					if (pinned) return
 					if (lastList.length === 0) {
+						if (frameRelayDisabled) { renderRelayDisabled(); return }
 						setTitle('Agent 浏览器')
 						body.innerHTML = `<div class="dsh-ego-empty">${wt('noActivePages')}<br><span style="font-size:11px;">${wt('noActiveHint')}</span></div>`
 						liveCount = 0
@@ -1891,6 +2178,9 @@ declare function require(id: string): any
 				// pure metadata now); thumbnails come from the SSE frame cache.
 				let lastSawActive = false
 				const refresh = () => {
+					// While the relay is off there is nothing to sync: the host refuses the
+					// space list anyway, so render the disabled state directly.
+					if (frameRelayDisabled) { renderRelayDisabled(); return }
 					void (async () => {
 						try {
 							const res = await fetch(SPACES_ROUTE, { cache: 'no-store' })
@@ -1985,10 +2275,22 @@ declare function require(id: string): any
 				}
 
 				let reconnectFallbackTimer = null
+				// Open the pull streams UNLESS the settings switch disabled the frame relay.
+				// The host's /api/ego/watch/status carries the authoritative flag
+				// (`frameRelay:false`), so a stale client flag can never open a stream the
+				// host refuses to serve; when it is off we render the disabled state and
+				// open NO EventSource at all.
 				const openStream = () => {
+					if (disposed || frameRelayDisabled) { if (frameRelayDisabled) renderRelayDisabled(); return }
+					fetch(WATCH_STATUS_ROUTE, { cache: 'no-store' }).then((res) => res.ok ? res.json() : null).then((status) => {
 					if (disposed) return
-					fetch(WATCH_STATUS_ROUTE, { cache: 'no-store' }).then((res) => res.ok ? res.json() : null).then(applyCaptureStatus).catch(() => {})
-					try { if (sse) sse.close() } catch {}
+					if (frameRelayOff(status)) { teardownRelay(); renderRelayDisabled(); return }
+					applyCaptureStatus(status)
+					connectStream()
+				}).catch(() => { if (!disposed && !frameRelayDisabled) connectStream() })
+				}
+				const connectStream = () => {
+					if (disposed || frameRelayDisabled || sse) return
 					doConnected = false
 					sse = new EventSource('/api/ego/stream')
 					sse.onopen = () => { doConnected = true }
@@ -2235,8 +2537,19 @@ clearTimeout((panel as any)._dshHideT)
 				const onVisibility = () => { if (document.visibilityState !== 'hidden' && !panel.hidden) { if (!sse) openStream(); syncWatch(selectedTabId || currentActiveId) } }
 				document.addEventListener('visibilitychange', onVisibility)
 
+				// Settings switch, live: turning the relay off tears every pull stream of
+				// this panel down at once (no reconnect loop), turning it back on resumes
+				// them — no page reload needed.
+				const offRelayWatch = frameRelaySubscribe((disabled) => {
+					if (disposed) return
+					if (disabled) { teardownRelay(); renderRelayDisabled(); return }
+					openStream()
+					refresh()
+				})
+
 				return () => {
 					disposed = true
+					offRelayWatch()
 					if (liveFlushRaf != null) try { window.cancelAnimationFrame(liveFlushRaf) } catch {}
 					if (followTimer) window.clearTimeout(followTimer)
 					if (reconnectFallbackTimer) window.clearTimeout(reconnectFallbackTimer)
@@ -2494,6 +2807,9 @@ clearTimeout((panel as any)._dshHideT)
 				zoomHint: null,
 				wiringStale: false,
 				backend: 'cdp', streamState: 'idle', streamMessage: '', streamGeneration: 0, streamMime: 'video/mp4; codecs="avc1.42E01E"',
+				// Mirrors the settings switch: the Tab shows the disabled state
+				// (and opens no stream) while the frame relay is off.
+				relayDisabled: false,
 			}
 		}
 		LivePreviewController.prototype.subscribe = function (cb) {
@@ -2562,17 +2878,38 @@ clearTimeout((panel as any)._dshHideT)
 				s.streamMessage = self.streamMessage
 				s.streamGeneration = self.streamGeneration
 				s.streamMime = self.streamMime
+				s.relayDisabled = frameRelayDisabled
 			})
 			this._syncWatch(currentTargetId)
 		}
 		LivePreviewController.prototype.start = function () {
 			document.addEventListener('visibilitychange', this.onDocumentVisibility)
+			var self = this
+			// Live settings switch: off tears the pull streams down at once,
+			// back on resumes them without a page reload.
+			this.offRelayWatch = frameRelaySubscribe(function (disabled) { self._onRelayChange(disabled) })
 			this._recompute()
 			if (this.visible) { this.refresh(); this.openStream() }
+		}
+		LivePreviewController.prototype._onRelayChange = function (disabled) {
+			if (this.disposed) return
+			if (disabled) {
+				this.closeStream()
+				this._destroyVideo()
+				this._stopWatch(false)
+				this.lastList = []
+				this.pageMeta.clear()
+				this.frameCache.clear()
+				this.streamState = 'idle'
+				this.streamMessage = ''
+			}
+			this._recompute()
+			if (!disabled && this.visible) { this.refresh(); this.openStream(); this._syncWatch(this.currentActiveId) }
 		}
 		LivePreviewController.prototype.dispose = function () {
 			this.keyboardProxy.dispose()
 			this.disposed = true
+			if (this.offRelayWatch) { try { this.offRelayWatch() } catch (e) {} this.offRelayWatch = null }
 			if (this.liveFlushRaf != null) try { window.cancelAnimationFrame(this.liveFlushRaf) } catch (e) {}
 			if (this.followTimer) window.clearTimeout(this.followTimer)
 			if (this.reconnectFallbackTimer) window.clearTimeout(this.reconnectFallbackTimer)
@@ -2687,6 +3024,15 @@ clearTimeout((panel as any)._dshHideT)
 		// `spaces` event broadcast by the worker every ~500ms.
 		LivePreviewController.prototype.refresh = function () {
 			var self = this
+			// While the relay is off there is nothing to sync (the host refuses
+			// the space list): surface the disabled state instead of fetching.
+			if (frameRelayDisabled) {
+				self.lastList = []
+				self.pageMeta.clear()
+				self.frameCache.clear()
+				self._recompute()
+				return
+			}
 			void (async function () {
 				try {
 					var res = await fetch(SPACES_ROUTE, { cache: 'no-store' })
@@ -2736,11 +3082,25 @@ clearTimeout((panel as any)._dshHideT)
 			if (busy !== this.lastSawActive) this.lastSawActive = busy
 			this._recompute()
 		}
+		// Open the pull streams UNLESS the frame relay is disabled. The host's
+		// /api/ego/watch/status is authoritative (`frameRelay:false`), so a stale
+		// client flag can never open a stream the host refuses to serve; when the
+		// relay is off this opens NO EventSource and the Tab renders the disabled
+		// state instead of reconnect-looping.
 		LivePreviewController.prototype.openStream = function () {
-			if (this.disposed || !this.visible) return
-			this.closeStream()
+			if (this.disposed || !this.visible || frameRelayDisabled) return
 			var self = this
-			fetch(WATCH_STATUS_ROUTE, { cache: 'no-store' }).then(function (res) { return res.ok ? res.json() : null }).then(function (status) { self._applyCaptureStatus(status) }).catch(function () {})
+			fetch(WATCH_STATUS_ROUTE, { cache: 'no-store' }).then(function (res) { return res.ok ? res.json() : null }).then(function (status) {
+				if (self.disposed || !self.visible || frameRelayDisabled) return
+				if (frameRelayOff(status)) { self.closeStream(); self._destroyVideo(); self._recompute(); return }
+				self._applyCaptureStatus(status)
+				self._connectStream()
+			}).catch(function () { if (!self.disposed && self.visible && !frameRelayDisabled) self._connectStream() })
+		}
+		LivePreviewController.prototype._connectStream = function () {
+			if (this.disposed || frameRelayDisabled || this.sse) return
+			var self = this
+			this.closeStream()
 			try {
 				this.sse = new EventSource('/api/ego/stream')
 			} catch (e) { return }
@@ -3233,8 +3593,8 @@ clearTimeout((panel as any)._dshHideT)
 			if (!currentSpace) {
 				body = h('div', { className: 'dsh-ego-side-body' },
 					h('div', { className: 'dsh-ego-side-empty' },
-						h('div', null, wt('noActivePages')),
-						h('div', { style: { fontSize: '11px' } }, wt('noActiveHint'))
+						h('div', null, state.relayDisabled ? wt('relayDisabledTitle') : wt('noActivePages')),
+						h('div', { style: { fontSize: '11px' } }, state.relayDisabled ? wt('relayDisabledBody') : wt('noActiveHint'))
 					)
 				)
 			} else {
@@ -3413,6 +3773,9 @@ clearTimeout((panel as any)._dshHideT)
 					var res = await fetch(SPACES_ROUTE, { cache: 'no-store' })
 					if (!res.ok) return
 					var data = await res.json()
+					// The host marks the payload when the frame relay is off; the
+					// probe must not hold a push channel in that case.
+					if (data && data.frameRelay === false) { frameRelaySet(true); closeProbeSse() }
 					if (data && typeof data.toolCallCount === 'number') {
 						baseline = data.toolCallCount
 					}
@@ -3421,10 +3784,20 @@ clearTimeout((panel as any)._dshHideT)
 			// Listen for tool-call events on the shared SSE stream. The probe
 			// opens its OWN EventSource so it works even before the Tab is
 			// mounted (the Tab's controller only connects after the Tab opens).
+			// While the frame relay is disabled there is no push channel at all,
+			// so the probe stays CLOSED rather than opening a stream the host
+			// refuses to serve.
 			var probeSse = null
-			try { probeSse = new EventSource('/api/ego/stream') } catch (e) {}
-			if (probeSse) {
-				probeSse.addEventListener('tool-call', function (ev) {
+			var openProbeSse = function () {
+				if (probeDisposed || probeSse || frameRelayDisabled) return
+				try { probeSse = new EventSource('/api/ego/stream') } catch (e) { probeSse = null; return }
+				probeSse.addEventListener('tool-call', onProbeToolCall)
+			}
+			var closeProbeSse = function () {
+				try { if (probeSse) probeSse.close() } catch (e) {}
+				probeSse = null
+			}
+			var onProbeToolCall = function (ev) {
 					if (probeDisposed) return
 					try {
 						var m = JSON.parse(ev.data)
@@ -3442,12 +3815,18 @@ clearTimeout((panel as any)._dshHideT)
 						}
 						if (m.count > baseline) openWatchTab(sid)
 					} catch (e) {}
-				})
 			}
+			openProbeSse()
+			// The settings switch can also flip at runtime; mirror it here.
+			var offProbeRelay = frameRelaySubscribe(function (disabled) {
+				if (disabled) closeProbeSse()
+				else openProbeSse()
+			})
 
 			return function () {
 				probeDisposed = true
-				try { if (probeSse) probeSse.close() } catch (e) {}
+				if (offProbeRelay) { try { offProbeRelay() } catch (e) {} }
+				closeProbeSse()
 				disposeTab()
 				styleEl.remove()
 			}

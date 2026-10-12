@@ -529,6 +529,7 @@ interface EgoRuntimeConfig {
   readonly idleTimeoutMin: number
   readonly chromeArgs: string
   readonly isolateSpaces: boolean
+  readonly disableFrameRelay: boolean
 }
 
 interface ExecLike {
@@ -723,9 +724,24 @@ export function apply(ctx: EgoContext, config: RawConfig = {}): void {
     'ffmpegEncoder', 'ffmpegPath', 'githubMirror', 'egoCliArgs', 'chromeArgs',
     'castFpsCap', 'screencastQuality', 'screencastMaxWidth', 'backstopIntervalMs',
     'idleTimeoutMin',
+    'disableFrameRelay',
   ]
   const entry = Object.fromEntries(settingKeys.filter((key) => config[key] !== undefined).map((key) => [key, config[key]]))
-  const bridge = installEgoBrowserSettings(ctx, entry)
+  // DSH 0.1.7：可注册的 settings 命名空间被换成了 loader 条目上的配置文档，用户
+  // 偏好的活值由 loader 持有并在 volatile 提交后更新，所以读路径必须离开旧的
+  // `ctx.settings.register` 作用域。`ctx.config` 需要 inject 才能访问，取不到就
+  // 用 apply 收到的 config 对象 —— 0.1.7 把 volatile 字段包成引用后，这个对象上
+  // 的引用是「指向活值」的，所以通过 `.get()` 解包（config.ts: unwrapVolatile）
+  // 就能读到提交后的最新值。
+  const bridge = installEgoBrowserSettings(ctx, entry, () => {
+    let live: Record<string, unknown> | undefined
+    try {
+      live = (ctx as unknown as { config?: Record<string, unknown> }).config
+    } catch {
+      live = undefined
+    }
+    return live ?? (config as unknown as Record<string, unknown>)
+  })
   const ffmpegManager = getSharedFfmpegInstallationManager()
   const initialFfmpegConfig = resolveConfig(bridge.source() as RawConfig)
   void ffmpegManager.check({ configuredPath: initialFfmpegConfig.ffmpegPath, requestedEncoder: initialFfmpegConfig.ffmpegEncoder }).catch(() => {
@@ -766,6 +782,9 @@ export function apply(ctx: EgoContext, config: RawConfig = {}): void {
     get chromeArgs() { return resolveConfig(bridge.source() as RawConfig).chromeArgs },
     get isolateSpaces() { return resolveConfig(bridge.source() as RawConfig).isolateSpaces },
     get idleTimeoutMin() { return resolveConfig(bridge.source() as RawConfig).idleTimeoutMin },
+    // Live getter: cast-server reads this on EVERY /api/ego/* request, so the
+    // settings card toggle takes effect without a host restart.
+    get disableFrameRelay() { return resolveConfig(bridge.source() as RawConfig).disableFrameRelay },
   }
   const reg = (tool: ToolHandle): void => {
     const dispose = ctx.tools.register(tool) as unknown as () => void
@@ -1042,7 +1061,9 @@ function registerAuthFlush(ctx: EgoContext, cfg: EgoRuntimeConfig, reg: (tool: T
               ok: !!jbody.ok,
               total: jbody.total ?? 0,
               flushed: jbody.flushed ?? 0,
-              error: jbody.error,
+              // [#60-3] undefined is not lossless JSON — strict hosts reject
+              // the WHOLE result; omit the key when there is no error.
+              ...(typeof jbody.error === 'string' ? { error: jbody.error } : {}),
             }
           } catch (err) {
             return { ok: false, error: String((err as Error)?.message || err) }
@@ -1101,6 +1122,8 @@ function registerLoginImport(ctx: EgoContext, cfg: EgoRuntimeConfig, reg: (tool:
             matched: { type: 'integer' },
             written: { type: 'integer' },
             domains: { type: 'json' },
+            closedSource: { type: 'boolean' },
+            restoredFromBackup: { type: 'boolean' },
             error: { type: 'string' },
           },
         },
