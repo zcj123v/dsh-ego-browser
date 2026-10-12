@@ -2485,8 +2485,22 @@ import { clampPanelSize, parsePanelSize, PANEL_DEFAULT_W, PANEL_MIN_W, HISTORY_E
 				// 408px width and the content-driven height.
 				const makeResizable = (handle) => {
 					let sx = 0, sy = 0, bw = 0, bh = 0, active = false
+					// Single cleanup path for every way a drag can end. A missed
+					// pointerup (released outside the window, capture disturbed by
+					// the surrounding web app) used to leave `active` latched on,
+					// so later hovers over the grip kept resizing the panel as if
+					// the button were still held — the ghost-drag bug (fix3).
+					const finish = (e) => {
+						if (!active) return
+						active = false
+						panel.classList.remove('dsh-ego-resizing')
+						try { if (e && e.pointerId !== undefined) handle.releasePointerCapture(e.pointerId) } catch {}
+						if (panelWidthUser > 0 || panelHeightUser > 0) {
+							try { localStorage.setItem(SIZE_KEY, JSON.stringify({ w: panelWidthUser, h: panelHeightUser })) } catch {}
+						}
+					}
 					const down = (e) => {
-						if (e.button !== 0) return
+						if (e.button !== 0 || !e.isPrimary) return
 						active = true
 						sx = e.clientX; sy = e.clientY
 						bw = panel.offsetWidth; bh = panel.offsetHeight
@@ -2496,6 +2510,10 @@ import { clampPanelSize, parsePanelSize, PANEL_DEFAULT_W, PANEL_MIN_W, HISTORY_E
 					}
 					const move = (e) => {
 						if (!active) return
+						// Ghost-drag guard: a pointermove with no buttons held means
+						// the button was released without a pointerup reaching us —
+						// end the drag instead of resizing on a bare hover.
+						if ((e.buttons & 1) === 0) { finish(e); return }
 						const extra = historyOpen ? HISTORY_EXTRA_W : 0
 						const next = clampPanelSize(bw + (e.clientX - sx) + extra, bh + (e.clientY - sy), window.innerWidth, window.innerHeight)
 						// Keep the stored base width meaningful with the drawer open:
@@ -2506,15 +2524,6 @@ import { clampPanelSize, parsePanelSize, PANEL_DEFAULT_W, PANEL_MIN_W, HISTORY_E
 						panel.style.width = next.w + 'px'
 						panel.style.height = next.h + 'px'
 					}
-					const up = (e) => {
-						if (!active) return
-						active = false
-						panel.classList.remove('dsh-ego-resizing')
-						try { handle.releasePointerCapture(e.pointerId) } catch {}
-						if (panelWidthUser > 0 || panelHeightUser > 0) {
-							try { localStorage.setItem(SIZE_KEY, JSON.stringify({ w: panelWidthUser, h: panelHeightUser })) } catch {}
-						}
-					}
 					const dbl = () => {
 						panelWidthUser = 0
 						panelHeightUser = 0
@@ -2523,8 +2532,11 @@ import { clampPanelSize, parsePanelSize, PANEL_DEFAULT_W, PANEL_MIN_W, HISTORY_E
 					}
 					handle.addEventListener('pointerdown', down)
 					handle.addEventListener('pointermove', move)
-					handle.addEventListener('pointerup', up)
-					handle.addEventListener('pointercancel', up)
+					handle.addEventListener('pointerup', finish)
+					handle.addEventListener('pointercancel', finish)
+					// Implicit release after pointerup also fires this; finish()
+					// is idempotent (guards on !active), so double invocation is fine.
+					handle.addEventListener('lostpointercapture', finish)
 					handle.addEventListener('dblclick', dbl)
 				}
 				makeResizable(panel.querySelector('#dsh-ego-resize'))

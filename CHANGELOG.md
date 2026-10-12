@@ -40,6 +40,18 @@
 - `pnpm typecheck`（host + client）通过；`pnpm test` **21 文件 / 147 passed / 5 skipped**（新增 `tests/panel-size.test.ts` 9 项：clamp 边界/取整、drawer 叠加、parse 合法/非法/越界-clamp/非有限数拒绝）；`pnpm build` 重生成产物（client 467.95 kB）。
 - `.6` 实机验收随部署进行（拖拽跟手/记忆/双击复位/drawer 回落/zoom 后点击精度）。
 
+## [0.8.6-fix3] - 2026-10-12 — 幽灵拖拽修复（手柄 hover 即触发 resize）
+
+### 修复
+- **拖拽状态残留**：`.6` 实测报告——鼠标未按下、仅在手柄上移动就持续触发 resize。根因是 `active` 标志只能靠 `pointerup`/`pointercancel` 复位，任一丢失（窗口边缘外释放、指针捕获被宿主 web 层干扰）后永久残留，后续 hover 的 pointermove 被当作拖拽中。三重防御：
+  1. **按键兜底（决定性）**：pointermove 时 `e.buttons` 左键位为 0 → 立即收尾——按键已松却还在发 move 即幽灵拖拽铁证；
+  2. 监听 `lostpointercapture`（capture 意外丢失即收尾；up 后的隐式释放也会触发，`finish()` 以 `!active` 幂等防重）；
+  3. `pointerdown` 增加 `isPrimary` 检查（多指针设备）。
+- 收尾统一为 `finish()`：复位标志、移除 `.dsh-ego-resizing`、释放捕获、写 localStorage。
+
+### 验证
+- typecheck（host + client）通过；vitest 147 passed / 5 skipped；build 重生成。`.6` 实机回归随部署进行（正常拖拽/松手后 hover 不再 resize/窗外释放后回扫手柄无残留）。
+
 ## [上游 v0.8.6] - 2026-09-28 — 登录态导入安全加固 + DSH 0.1.7 设置适配 + 人机验证误报修复
 
 ### 安全
