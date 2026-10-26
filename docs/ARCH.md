@@ -14,26 +14,22 @@
 
 ```
 ego-browser/
-  package.json          # 版本号、build=语法校验、exports
-  lib/index.js          # [后端] 插件入口 + 30+ ego_* 工具注册（权威）
-  lib/cast-server.js    # [后端] host 路由：把前端 /api/ego/* 转发到观察窗 worker
-  lib/ffmpeg-installation.js # [后端] FFmpeg 检测、下载、校验与托管缓存
-  lib/ffmpeg-manifest.js # 固定平台资源、版本、SHA-256 与 GitHub 镜像改写
-  lib/client.js         # [前端] 右下角观察窗（通过 DSH 注入加载，单文件）
-  bin/ego-cast-worker.mjs  # [后端] 观察窗 worker：attach 浏览器、SSE 实时画面、humanCheck
-  bin/cdp-client.mjs       # CDP 请求/错误/事件封装
-  bin/capture-manager.mjs  # watcher lease、单后端状态机、generation
-  bin/capture-cdp.mjs      # control session + 单 target JPEG capture
-  bin/capture-ffmpeg.mjs   # FFmpeg 进程与 fMP4 发布
-  bin/ffmpeg-probe.mjs     # 可执行性、平台输入与 H.264 编码器探测
-  bin/capture-platform.mjs # 平台来源/crop/argv
-  bin/mp4-fragments.mjs    # 有界 ISO BMFF box parser
-  runtime/              # vendored ego-lite 运行时（只读参照，本地改动见 runtime/PATCHES.md）
-  docs/ARCH.md          # 本文件
+  package.json          # 版本号、Harness兼容声明、构建命令与exports
+  src/index.ts          # [后端源码] 入口和ego_*工具
+  src/cast-server.ts    # [后端源码] 观察窗HTTP桥接
+  src/client/index.ts   # [前端源码] 观察窗与交互
+  src/worker/           # [源码] CDP/FFmpeg采集、mp4解析等
+  src/ffmpeg-*.ts       # FFmpeg检测、校验与安装
+  lib/index.js          # tsdown生成的单文件host包
+  lib/client.js         # tsdown生成的ModuleLoader前端包
+  bin/ego-cast-worker.mjs # tsdown生成的独立worker包
+  bin/ego-chrome-wrapper.sh # root/容器Chrome启动wrapper，打包须保留0755
+  runtime/              # vendored ego-lite运行时；修改同步runtime/PATCHES.md
+  tests/                # 回归测试，含真实Harness兼容门禁
+  tsdown.config.ts      # 三路构建配置
 ```
 
-**关键约定**：`lib/` 是唯一权威源。**不要**再建 `src/`、不要用 tsc 编译覆盖 lib
-（v0.6.0 已删除 src 和 tsconfig，`npm run build` 只做语法校验）。
+**关键约定**：当前已完成TS重构，`src/` 是唯一业务源码，`lib/` 和worker mjs均为生成产物。修改源码后运行 `pnpm typecheck && pnpm test && pnpm build`，不得直接修改生成产物制造源码/打包不一致。下文的lib模块名指其运行时职责，对应维护入口在src/。
 
 ---
 
@@ -113,10 +109,9 @@ worker 与 lib/index.js 的探针逻辑（humanCheck）是两份相似实现—�
 ---
 
 ## 6. 防冲突规范（最重要）
-1. **lib/ 是唯一权威**：别建 src/，别 tsc 覆盖。
-2. **改 lib/index.js 后记得同步已安装副本**（`~/.dsh/.external-plugins/ego-browser/lib/`）并
-   `node --check`。前端/worker 改动需重启 DSH。
+1. **src/ 是业务源码真源**：不要手改 `lib/` 和worker生成产物；vendored runtime修改同步其补丁记录。
+2. 修改后运行 `pnpm typecheck && pnpm test && pnpm build`，检查三路产物，再通过打包和宿主标准插件安装命令部署，不直接覆盖安装副本。
 3. **加工具走 t() + withEgoLock**，补 help 索引。
-4. **跨运行时（前端/worker/工具）的重复逻辑**改动时要同步两份，并标注「改动时同步」。
-5. **发版本**：改 `package.json` 版本 → 更新 README 章节 → `git tag vX.Y.Z` branch 打 tag → push。
-6. `npm run build` 只做语法校验，不生成/覆盖任何东西。
+4. **跨运行时（前端/worker/工具）的重复逻辑**改动时要同步两份。
+5. **发版本**：按 `<上游版本>-fix<N>` 同步 `package.json`、`dsh-plugin.json` 和版本文档；精确锁定实际验证的Harness版本，不使用兼容豁免掩盖未适配问题。
+6. 前端/worker改动部署后重载DSH，验证真实工具调用、观察窗和包执行位；容器部署还须同步持久化恢复种子。

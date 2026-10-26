@@ -1,5 +1,10 @@
 allowBuilds:
+  '@deepseek-ai/dsh-subprocess-local': false
+  '@google/genai': false
   esbuild: true
+  koffi: false
+  node-pty: false
+  protobufjs: false
 
 # pnpm 11+ 内置 24 小时 minimumReleaseAge：新版发布未满 24h 时，pnpm install 会以
 # loose 模式把 name@version 追加进本文件，导致受管内容被改写。

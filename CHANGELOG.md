@@ -2,6 +2,13 @@
 
 所有对用户可见的变更集中在各版本号下。格式遵循 [Keep a Changelog](https://keepachangelog.com/)，版本语义遵循 [SemVer](http://semver.org/)。
 
+## [0.8.6-fix4] - 2026-10-26 — Harness rc.3 兼容恢复
+
+- 本轮仍基于上游0.8.6，不混入0.9.2功能；六个Harness peer与SDK开发依赖按实际验证精确声明0.2.1-rc.3，不再把旧0.1.5范围当作可加载证明，不使用兼容豁免。
+- 增加真实 `evaluatePluginCompatibility` 门禁回归：当前rc.3无豁免通过，未验证旧宿主不宣称兼容。
+- host/client类型检查、149项测试与tsdown构建通过，5项登录态导入端到端测试仍按原环境门控跳过。打包Chrome wrapper保留0755。
+- 包内辅助manifest版本同步0.8.6-fix4；文档纠正TS源码与生成产物职责。k8s真实宿主验收结果见主仓当日日志。
+
 ## [0.8.6-fix1] - 2026-10-12 — 吸收上游 v0.8.6（#61 数据丢失修复 / 0.1.7+ settings 适配 / captcha 误报）
 
 ### 合并

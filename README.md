@@ -6,14 +6,16 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/DSH-%5E0.1.5--rc.1-blue" alt="DSH ^0.1.5-rc.1">
+  <img src="https://img.shields.io/badge/DSH-0.2.1--rc.3-blue" alt="DSH 0.2.1-rc.3">
   <img src="https://img.shields.io/badge/DSH--better--sidebar-%3E%3D0.12.2(optional)-red" alt="dsh-better-sidebar >= 0.12.2 (optional)">
   <img src="https://img.shields.io/badge/Node-%3E%3D22-brightgreen?logo=node.js&logoColor=white" alt="Node >= 22">
 </p>
 
 > **仓库**：`github.com/Fisfzy/ego-browser`｜版本历史见 [CHANGELOG.md](CHANGELOG.md)｜详情页：[dshfind](https://dshfind.com/zh/plugins/Fisfzy/ego-browser)
 
-**DSH 版本支持**：本版本 **v0.8.6-fix1**（fork 版本号规则 `<上游版本>-fix<N>` 的首个版本，见 CHANGELOG「版本号」节）已**合并上游 `Fisfzy/ego-browser` 至 v0.8.6**（#61 cookie 库数据丢失修复、DSH 0.1.7+ settings 运行时探测适配、#62 captcha 误报修复、`disableFrameRelay` 开关；逐条见 [CHANGELOG.md](CHANGELOG.md)）。`engines.dsh` 与 peer 依赖声明保持 `^0.1.5-rc.1`——semver 预发布规则下该范围同时匹配 `0.1.5-rc.1` 与 `0.1.5-rc.2`，因此本版本在 rc.1 宿主上同样可装，便于插件先于 harness 升级部署。已在 0.1.5-rc.2 的实际 SDK 类型下完成 `pnpm typecheck`（host + client）、全量 vitest（20 文件 / 138 passed / 5 skipped）与 `tsdown` 构建；**真实宿主验收随 fleet 0.2.0-rc.2 部署进行**（settings 面走上游 v0.8.6 的运行时探测：无 `register` 的 0.1.7+ 宿主自动切 forms/插件页行配置分支）。**0.1.2-rc.1 ～ 0.1.3-alpha.x 宿主请使用 v0.8.5**（其 `engines.dsh` 地板为 `>=0.1.2-rc.1`）；**0.1.0-rc.x / 0.1.1-rc.x 宿主请使用 v0.8.0 及更早版本**。v0.8.6 → v0.8.7 没有源码改动：刷新依赖解析到 0.1.5-rc.2 后重新验证，本插件使用的 API 面（`ctx.settings.register` + scope `watch`、`ctx.slots.inject/register`、`ctx.locale.register`、client 侧 `createSnapshotStore`、`ctx.subprocess`、`webServer`）无破坏性变更。此前 0.8.3 的适配点仍然有效：client 运行时改名（`@deepseek-ai/dsh-client-store`）、client 模块注册 id 与装载行名按声明包名、`dsh.client.inject` 仅声明真实模块图行、`webServer` 以嵌套注入交付（可选服务），并同步侧边栏 Tab（dsh-better-sidebar）模式。
+**当前版本 `0.8.6-fix4`**：基于上游0.8.6，仅针对 **Harness `0.2.1-rc.3`** 做兼容恢复。六个Harness peer和SDK开发依赖精确对齐rc.3，真实宿主门禁不需要 `allow-version` 豁免；未验证的旧宿主不在fix4支持范围。`pnpm typecheck`（host/client）、149项测试与 `pnpm build` 通过；5项登录态导入端到端测试按原环境门控跳过。安装一律固定本fork tarball版本，不能把已发布的上游0.9.2误当成本fork基线。
+
+**历史兼容记录（fix1–fix3；下方旧矩阵不适用于fix4）**：当时版本 **v0.8.6-fix1**（fork 版本号规则 `<上游版本>-fix<N>` 的首个版本，见 CHANGELOG「版本号」节）已**合并上游 `Fisfzy/ego-browser` 至 v0.8.6**（#61 cookie 库数据丢失修复、DSH 0.1.7+ settings 运行时探测适配、#62 captcha 误报修复、`disableFrameRelay` 开关；逐条见 [CHANGELOG.md](CHANGELOG.md)）。`engines.dsh` 与 peer 依赖声明保持 `^0.1.5-rc.1`——semver 预发布规则下该范围同时匹配 `0.1.5-rc.1` 与 `0.1.5-rc.2`，因此本版本在 rc.1 宿主上同样可装，便于插件先于 harness 升级部署。已在 0.1.5-rc.2 的实际 SDK 类型下完成 `pnpm typecheck`（host + client）、全量 vitest（20 文件 / 138 passed / 5 skipped）与 `tsdown` 构建；**真实宿主验收随 fleet 0.2.0-rc.2 部署进行**（settings 面走上游 v0.8.6 的运行时探测：无 `register` 的 0.1.7+ 宿主自动切 forms/插件页行配置分支）。**0.1.2-rc.1 ～ 0.1.3-alpha.x 宿主请使用 v0.8.5**（其 `engines.dsh` 地板为 `>=0.1.2-rc.1`）；**0.1.0-rc.x / 0.1.1-rc.x 宿主请使用 v0.8.0 及更早版本**。v0.8.6 → v0.8.7 没有源码改动：刷新依赖解析到 0.1.5-rc.2 后重新验证，本插件使用的 API 面（`ctx.settings.register` + scope `watch`、`ctx.slots.inject/register`、`ctx.locale.register`、client 侧 `createSnapshotStore`、`ctx.subprocess`、`webServer`）无破坏性变更。此前 0.8.3 的适配点仍然有效：client 运行时改名（`@deepseek-ai/dsh-client-store`）、client 模块注册 id 与装载行名按声明包名、`dsh.client.inject` 仅声明真实模块图行、`webServer` 以嵌套注入交付（可选服务），并同步侧边栏 Tab（dsh-better-sidebar）模式。
 ### 版本兼容矩阵
 
 | 依赖 | 最低版本 | 推荐版本 | 说明 |
