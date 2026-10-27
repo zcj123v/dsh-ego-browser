@@ -20,8 +20,10 @@
 >
 > | fork 自有项 | 上游 v0.9.4 现状 | 本次处置 |
 > |---|---|---|
-> | 观察窗面板自由缩放（浮动面板拖拽手柄、`panel-size.ts`、localStorage 记忆、双击复位） | **上游已覆盖且更完整**：v0.9.1 侧栏「尺寸同步」开关 + 右侧 / 底部 / 右下角手柄（按拖动增量 1:1 改真实窗口，`POST /api/ego/window-size` + CDP `Browser.setWindowBounds`）+ 16:9 / 4:3 / 21:9 / 1:1 / 9:16 比例预设；v0.9.3 已删除浮动 FAB / 浮窗 | **移除** fork 实现与 `panel-size` 模块；缩放只走上游 `/api/ego/window-size`，不恢复旧浮动 UI |
-> | 幽灵拖拽守卫（`pointerup` 丢失后裸 hover 仍继续 resize） | 上游 `beginResize` 的 `onMove` 未校验 `ev.buttons` | **保留最小修复**：`onMove` 在计算/发送增量前发现 `ev.buttons === 0` 即调用同一个 `onUp` 收尾并返回 |
+> | 观察窗面板自由缩放（浮动面板拖拽手柄、`panel-size.ts`、localStorage 记忆、双击复位） | **上游已覆盖且更完整**：v0.9.1 侧栏「尺寸同步」开关 + 右侧 / 底部 / 右下角手柄 + 16:9 / 4:3 / 21:9 / 1:1 / 9:16 比例预设；v0.9.3 已删除浮动 FAB / 浮窗 | **移除** fork 实现与 `panel-size` 模块，不恢复旧浮动 UI |
+> | 幽灵拖拽守卫（旧浮动面板手柄 `pointerup` 丢失后裸 hover 继续 resize） | 旧浮动手柄已随 v0.9.3 删除；上游 `beginResize.onMove` 仍不校验 `ev.buttons` | **保留最小防御**（7 行）：`onMove` 在计算/发送增量前发现 `ev.buttons === 0` 即调用同一个 `onUp` 收尾并返回；**该守卫属代码层防御，不再是用户入口的验收项** |
+>
+> **观察入口现状（2026-10-27 用户确认）**：使用 **DSH 右侧边栏的「Agent 浏览器」抽屉**查看与接管 agent 浏览器；不再有浮动面板，也不再需要鼠标拖拽操作。日常验收 = 抽屉能打开、能看到实时画面并能点选/输入；`/api/ego/window-size` 与比例预设仍可用于设定真实窗口尺寸，但不是必测项。
 >
 > 另保留两处**跨平台测试一致性修复**（非功能差异；上游无 CI，故在 macOS 上才暴露）：`selectEncoder` 使用注入的 `platform` 而非 `process.platform`、`login-import` 用例改用 `node:path` 原生路径断言。本 fork 的发布物用 **`npm pack`**（**不要用 `pnpm pack`**：pnpm 12.4.2 会把 `bin/ego-chrome-wrapper.sh` 等三个可执行文件归一成 `0644`，而插件把该 wrapper 作为 `EGO_LINUX_CHROME` 直接 spawn，执行位是载荷的一部分；npm 12.0.2 的 pack 保留 `0755`）打成 `file:` tarball 装机，下文关于 npm 包 / GitHub Release 的描述指向上游发布渠道。
 
