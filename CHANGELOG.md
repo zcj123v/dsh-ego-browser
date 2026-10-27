@@ -29,9 +29,9 @@
 ### 验证
 - `pnpm install --no-frozen-lockfile`（pnpm 12.4.2；仓库不追踪 `pnpm-lock.yaml`，不为补锁文件扩大差异）。
 - `pnpm typecheck`：通过（host + client 两个 program）。
-- `pnpm test`：**38 文件 passed + 3 skipped；258 passed / 7 skipped**（新增 ghost-drag 回归 1 项；跳过者为需真实 Chrome / 非本机平台的 e2e 门控用例）。
+- `pnpm test`：**38 文件 passed + 3 skipped；259 passed / 7 skipped**（新增 ghost-drag 回归 1 项；跳过者为需真实 Chrome / 非本机平台的 e2e 门控用例）。
 - `pnpm build`：tsdown 重新生成 `lib/index.js`、`lib/client.js`（+map）、`bin/ego-cast-worker.mjs`（+map）。
-- `pnpm pack`：tarball 版本 `0.9.4-fix1`，内容与 SHA-256 见本轮任务报告。
+- **`npm pack`（不是 `pnpm pack`）**：tarball 版本 `0.9.4-fix1`，内容与 SHA-256 见本轮任务报告。**打包必须用 `npm pack`**：pnpm 12.4.2 的 `pack` 会把 `bin/ego-cast-worker.mjs`、`bin/ego-chrome-wrapper.sh`、`runtime/ego-linux/bin/ego-browser.mjs` 归一成 `0644`，而插件把 wrapper 作为 `EGO_LINUX_CHROME` 直接 `spawn`（`src/index.ts:391`），执行位是载荷的一部分；`npm` 12.0.2 的 `pack` 保留 `0755`（与上一版 `0.9.0.tgz` 一致）。两个工具的包文件清单逐条相同（51 条），差异仅在文件 mode。
 - **尚未在真实 DSH 宿主 / 节点上做安装与工具调用验收**（与前几轮同样的诚实标注）；本轮只交付源码候选，不部署、不重启任何节点。
 
 ## [0.9.4] - 2026-10-27 — Chrome 风格 UI / 一键登录态 / ego_tabs

@@ -23,7 +23,7 @@
 > | 观察窗面板自由缩放（浮动面板拖拽手柄、`panel-size.ts`、localStorage 记忆、双击复位） | **上游已覆盖且更完整**：v0.9.1 侧栏「尺寸同步」开关 + 右侧 / 底部 / 右下角手柄（按拖动增量 1:1 改真实窗口，`POST /api/ego/window-size` + CDP `Browser.setWindowBounds`）+ 16:9 / 4:3 / 21:9 / 1:1 / 9:16 比例预设；v0.9.3 已删除浮动 FAB / 浮窗 | **移除** fork 实现与 `panel-size` 模块；缩放只走上游 `/api/ego/window-size`，不恢复旧浮动 UI |
 > | 幽灵拖拽守卫（`pointerup` 丢失后裸 hover 仍继续 resize） | 上游 `beginResize` 的 `onMove` 未校验 `ev.buttons` | **保留最小修复**：`onMove` 在计算/发送增量前发现 `ev.buttons === 0` 即调用同一个 `onUp` 收尾并返回 |
 >
-> 另保留两处**跨平台测试一致性修复**（非功能差异；上游无 CI，故在 macOS 上才暴露）：`selectEncoder` 使用注入的 `platform` 而非 `process.platform`、`login-import` 用例改用 `node:path` 原生路径断言。本 fork 的发布物经 `pnpm pack` 以 `file:` tarball 方式装机，下文关于 npm 包 / GitHub Release 的描述指向上游发布渠道。
+> 另保留两处**跨平台测试一致性修复**（非功能差异；上游无 CI，故在 macOS 上才暴露）：`selectEncoder` 使用注入的 `platform` 而非 `process.platform`、`login-import` 用例改用 `node:path` 原生路径断言。本 fork 的发布物用 **`npm pack`**（**不要用 `pnpm pack`**：pnpm 12.4.2 会把 `bin/ego-chrome-wrapper.sh` 等三个可执行文件归一成 `0644`，而插件把该 wrapper 作为 `EGO_LINUX_CHROME` 直接 spawn，执行位是载荷的一部分；npm 12.0.2 的 pack 保留 `0755`）打成 `file:` tarball 装机，下文关于 npm 包 / GitHub Release 的描述指向上游发布渠道。
 
 ### 版本兼容矩阵
 
