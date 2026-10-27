@@ -1,3 +1,5 @@
+import type { TuiStatusService, TuiToastService, TuiSettingsSectionsService } from './tui/types.ts'
+
 /**
  * ego-browser — shared host-side types.
  *
@@ -105,6 +107,9 @@ export interface SettingsService {
 
 /** Host context shape the plugin consumes (structural; not imported from cordis). */
 export interface EgoContext {
+  tuiStatus?: TuiStatusService
+  tuiToast?: TuiToastService
+  tuiSettingsSections?: TuiSettingsSectionsService
   tools: ToolRegistrar
   subprocess: SubprocessService
   logger?: LoggerLike
@@ -125,6 +130,12 @@ export interface ResolvedConfig {
   idleTimeoutMin: number
   /** True = the live frame relay (ego-cast worker + cast routes) is turned off entirely. */
   disableFrameRelay: boolean
+  /** Opt in to opening the TUI browser panel on the first browser tool call. */
+  tuiAutoOpenPanel: boolean
+  /** True = reuse a resident `ego-browser --serve` process across ego_* calls (issue #56). */
+  residentExecutor: boolean
+  /** Minutes without an ego_* call before the resident process is stopped. 0 = keep until unmount. */
+  residentIdleMin: number
   chromePath: string
   captureBackend: 'auto' | 'cdp' | 'ffmpeg'
   streamProfile: 'low' | 'balanced' | 'high'

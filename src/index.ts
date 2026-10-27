@@ -35,16 +35,25 @@
  * 加工具：在 registerActionTools 里 reg(t({...}))，并同步 EGO_HELP_INDEX，跑 npm run build。
  */
 import { defineTool } from '@deepseek-ai/dsh-tools'
-import { existsSync } from 'node:fs'
+import { existsSync, readdirSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
 import { homedir } from 'node:os'
+import { dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { importLoginCookies } from './login-import.ts'
+import { importLoginCookiesFromExtension } from './login-extension.ts'
+import { BrowserStateStore } from './browser-state.ts'
+import { installTui } from './tui/integration.ts'
+import { installBrowserPanel } from './tui/panel.ts'
+import { makeEnsureWorker, proxyFrom, proxyPost, readBrowserState, readTaskSpaceGroups } from './worker-client.ts'
+import { safeLocatorSummary, toolCallTitle } from './tui/presentation.ts'
 import { initCastServer, markEgoToolCall, getLastEgoActivity } from './cast-server.ts'
 import { EGO_HELP_INDEX } from './help.ts'
 import { HUMAN_CHECK_PROBE } from './captcha.ts'
 import { Config as ConfigSchema, resolveConfig, EGO_CLI_BLOCKED, CHROME_BLOCKED, filterArgs } from './config.ts'
 import { installEgoBrowserSettings } from './settings.ts'
 import { registerEgoBrowserGateway } from './gateway.ts'
+import { ResidentProcess, ResidentNotRunningError, type ResidentFrame } from './resident.ts'
 import { getSharedFfmpegInstallationManager } from './ffmpeg-installation.ts'
 import { SENTINEL, j, str, num, bool, readAll, SAFE_FN } from './util.ts'
 import type { EgoContext, RawConfig, ResolvedConfig, SubprocessService, ToolExec, WebServerLike } from './types.ts'
@@ -179,6 +188,7 @@ const BUNDLED_WRAPPER = fileURLToPath(
   new URL('../bin/ego-chrome-wrapper.sh', import.meta.url),
 )
 const IS_WIN = process.platform === 'win32'
+const IS_DARWIN = process.platform === 'darwin'
 const AUTO_ADAPT_OFF = /^(0|false|no)$/i.test(
   process.env.EGO_BROWSER_AUTO_ADAPT ?? '',
 )
@@ -213,6 +223,33 @@ function windowsChromeCandidates(): string[] {
     b(local) + '\\BraveSoftware\\Brave-Browser\\Application\\brave.exe',
   ]
   return out.filter(Boolean) as string[]
+}
+/**
+ * macOS registry-free probe of the usual `.app` bundles (no subprocess).
+ *
+ * Chrome on macOS is never on PATH: the launcher lives inside the bundle at
+ * `<App>.app/Contents/MacOS/<binary>`. Both the system-wide and per-user
+ * `/Applications` locations are probed, Chrome first so that a machine with
+ * several browsers picks the same one the README documents.
+ */
+function darwinChromeCandidates(): string[] {
+  const roots = ['/Applications']
+  if (process.env.HOME) {
+    roots.push(`${process.env.HOME}/Applications`)
+  }
+  const bundles = [
+    'Google Chrome.app/Contents/MacOS/Google Chrome',
+    'Chromium.app/Contents/MacOS/Chromium',
+    'Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
+    'Brave Browser.app/Contents/MacOS/Brave Browser',
+  ]
+  const out: string[] = []
+  for (const root of roots) {
+    for (const bundle of bundles) {
+      out.push(`${root}/${bundle}`)
+    }
+  }
+  return out
 }
 /** Find a usable Chrome binary by scanning PATH + common fixed locations. */
 export function findChromeBinary(): string | undefined {
@@ -256,6 +293,21 @@ export function findChromeBinary(): string | undefined {
     }
     return undefined
   }
+  // macOS: Chrome lives inside a `.app` bundle, never on PATH. Probe the bundle
+  // locations and stop there — the POSIX PATH walk below cannot find it (there
+  // is no `google-chrome` shim on macOS), so falling through only wastes time.
+  if (IS_DARWIN) {
+    for (const p of darwinChromeCandidates()) {
+      try {
+        if (existsSync(p)) {
+          return p
+        }
+      } catch {
+        // fall through
+      }
+    }
+    return undefined
+  }
   // POSIX: absolute + PATH walk.
   for (const name of COMMON_CHROME_BINS) {
     if (name.includes('/')) {
@@ -289,9 +341,17 @@ function isPosixRoot(platform: NodeJS.Platform = process.platform): boolean {
   const uid = process.getuid?.()
   return typeof uid === 'number' && uid === 0 && platform !== 'win32'
 }
-/** No display server → headless is required (Linux/macOS headless servers). */
+/** No display server → headless is required (Linux headless servers). */
 function isHeadlessDetected(platform: NodeJS.Platform = process.platform, env: NodeJS.ProcessEnv = process.env): boolean {
-  // Windows and macOS always have a desktop session; only Linux headless servers need to run the backing browser headless.
+  // Windows and macOS always have a desktop session; only Linux headless
+  // servers need to run the backing browser headless.
+  //
+  // macOS must keep returning false here, and this is not the "adaptation" for
+  // #65: macOS GUI sessions are Aqua/Quartz and never export `$DISPLAY`, so its
+  // absence says nothing about whether a window can be shown — treating it as
+  // headless is precisely the regression that issue #16 fixed. The headed path
+  // works on darwin because the vendored runtime's ensureXDisplay() skips the
+  // Xvfb requirement on darwin exactly as it already does on win32 (#65).
   if (platform === 'win32' || platform === 'darwin') {
     return false
   }
@@ -334,7 +394,13 @@ export function resolveEgoEnv(cfg: Partial<ResolvedConfig>, { platform = process
   // the bundled wrapper is a POSIX shell script that cannot run here. Pass the
   // binary path directly so the vendored runtime (which uses POSIX `which`)
   // doesn't have to resolve it itself.
-  if (env.EGO_LINUX_CHROME === undefined && platform === 'win32' && chrome) {
+  //
+  // macOS shares both properties: no sandbox gate (the wrapper exists only to
+  // add --no-sandbox for root/Docker on Linux), and the vendored runtime's
+  // name-based lookup would never find a path inside a `.app` bundle. Without
+  // this branch `EGO_LINUX_CHROME` is never injected on darwin and the first
+  // cold start fails with "no Chrome/Chromium binary found" (issue #68).
+  if (env.EGO_LINUX_CHROME === undefined && (platform === 'win32' || platform === 'darwin') && chrome) {
     env.EGO_LINUX_CHROME = chrome
   }
   // Headless servers (no DISPLAY) must run the backing browser headless.
@@ -392,7 +458,8 @@ const COLD_START_SIGNS = [
   /target.*(closed|not found|detached|crashed)/i,
   /ECONNREFUSED/i,
 ]
-function isColdStartError(message: string): boolean {
+/** @internal exported for tests (also the contract the resident error relies on) */
+export function isColdStartError(message: string): boolean {
   return COLD_START_SIGNS.some((re) => re.test(message))
 }
 interface WarmupResult {
@@ -486,6 +553,7 @@ export async function runWithStaleSpaceRetry(  ctx: EgoContext,
     cfg.spaceTracker.resetToName()
     result = await withWarmupRetry(() => runEgoScript(ctx.subprocess, buildScript(), exec, cfg, graceOverrideMs))
   }
+  if (!result.ok && isColdStartError(result.error ?? '')) cfg.onColdStartFailure?.()
   return result
 }
 /** Find the last line carrying the sentinel and JSON-parse its payload. */
@@ -503,9 +571,35 @@ function parseSentinel(stdout: string): Record<string, unknown> | undefined {
   }
   return undefined
 }
+/**
+ * Parse the result of one script run: the sentinel payload when present, else
+ * the last parseable JSON line as a rescue path (#71: a script that succeeded
+ * but printed plain JSON used to be reported as a hard failure). The sentinel
+ * stays the primary contract; `fallback` marks the rescue so callers can say so.
+ * Exported for tests.
+ */
+export function parseSentinelOrLastJson(
+  stdout: string,
+): { value: Record<string, unknown>; fallback: boolean } | undefined {
+  const sentinel = parseSentinel(stdout)
+  if (sentinel !== undefined) return { value: sentinel, fallback: false }
+  const lines = stdout.split('\n')
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const text = lines[i]!.trim()
+    if (text === '' || !/^[[{]/.test(text)) continue
+    try {
+      return { value: JSON.parse(text) as Record<string, unknown>, fallback: true }
+    } catch {
+      // keep scanning upward
+    }
+  }
+  return undefined
+}
 
 /** The live runtime config object built in apply() (getters read the settings bridge). */
 interface EgoRuntimeConfig {
+  onColdStartFailure?: () => void
+  observeTool?: <T>(name: string, args: Record<string, unknown>, run: () => Promise<T> | T) => Promise<T>
   egoBin: string
   configuredDefaultSpace: string | number
   spaceTracker: ActiveSpaceTracker
@@ -530,13 +624,219 @@ interface EgoRuntimeConfig {
   readonly chromeArgs: string
   readonly isolateSpaces: boolean
   readonly disableFrameRelay: boolean
+  readonly tuiAutoOpenPanel: boolean
+  /** Reuse a resident `ego-browser --serve` process across ego_* calls (issue #56). */
+  readonly residentExecutor: boolean
+  /** Minutes without an ego_* call before the resident process is stopped. 0 = keep until unmount. */
+  readonly residentIdleMin: number
 }
 
 interface ExecLike {
   signal?: AbortSignal
 }
 
+// ── resident `--serve` transport (issue #56) ──────────────────────────────
+// One process per (bin, user CLI args) combination. Recreated when the user
+// changes egoCliArgs, stopped on idle timeout and on plugin teardown. Every
+// call still has the one-shot spawn path as a fallback, so a dead resident can
+// only cost latency, never a failed tool.
+let residentTransport: ResidentProcess | null = null
+let residentTransportKey = ''
+/**
+ * While a resident's CDP channel is dead (browser stopped, relaunch still
+ * settling), this timestamp parks the resident and lets the one-shot path do
+ * the call — it carries the launch retries. Without it every retry would spawn
+ * another doomed resident before the browser is back.
+ */
+let residentCooldownUntil = 0
+
+// ── #73 phase 2: executor diagnostics + failure supervision ────────────────
+// The panel/settings need to answer "is this call going through the resident,
+// how old is it, and why was it last rebuilt?" without DevTools. Supervision
+// stops the park → one-shot → respawn loop: after three consecutive cold-start
+// failures the resident stays parked (one-shot keeps working) until the user
+// toggles the setting or the plugin restarts.
+let residentConsecutiveFailures = 0
+let residentStartedAt = 0
+let residentLastRebuildReason = 'not started'
+let residentParkReason: string | null = null
+
+/** @internal exported for tests: the supervision state machine. */
+export function superviseResidentFailure(failures: number, error: string): { failures: number; parkReason: string | null } {
+  const next = failures + 1
+  return {
+    failures: next,
+    parkReason: next >= 3 ? `resident failed ${next} times in a row; last error: ${error}` : null,
+  }
+}
+
+export interface ResidentDiagnostics {
+  enabled: boolean
+  mode: 'resident' | 'starting' | 'one-shot'
+  running: boolean
+  pid: number | null
+  ageMs: number | null
+  consecutiveFailures: number
+  lastRebuildReason: string
+  parked: boolean
+  parkReason: string | null
+}
+
+/** @internal exported for tests (also used by /api/ego/executor + ego_status). */
+export function residentDiagnostics(cfg: EgoRuntimeConfig): ResidentDiagnostics {
+  const running = residentTransport !== null && residentTransport.alive
+  const active = cfg.residentExecutor === true && residentParkReason === null && Date.now() >= residentCooldownUntil
+  return {
+    enabled: cfg.residentExecutor === true,
+    mode: !active ? 'one-shot' : running ? 'resident' : 'starting',
+    running,
+    pid: running ? residentTransport?.pid ?? null : null,
+    ageMs: running && residentStartedAt > 0 ? Date.now() - residentStartedAt : null,
+    consecutiveFailures: residentConsecutiveFailures,
+    lastRebuildReason: residentLastRebuildReason,
+    parked: residentParkReason !== null,
+    parkReason: residentParkReason,
+  }
+}
+
+/** @internal exported for tests */
+export function resetResidentTransportForTests(): void {
+  const transport = residentTransport
+  residentTransport = null
+  residentTransportKey = ''
+  residentCooldownUntil = 0
+  residentConsecutiveFailures = 0
+  residentStartedAt = 0
+  residentLastRebuildReason = 'not started'
+  residentParkReason = null
+  transport?.stop()
+}
+
+function stopResidentTransport(): void {
+  const transport = residentTransport
+  residentTransport = null
+  residentTransportKey = ''
+  transport?.stop()
+}
+
+/**
+ * Return the live resident for this configuration, creating it when needed.
+ * @internal exported for tests
+ */
+export function ensureResidentTransport(cfg: EgoRuntimeConfig): ResidentProcess {
+  const extraCliArgs = filterArgs(cfg.egoCliArgs ?? '', EGO_CLI_BLOCKED)
+  const key = JSON.stringify([cfg.egoBin, extraCliArgs])
+  if (residentTransport !== null && residentTransportKey === key && residentTransport.alive) {
+    return residentTransport
+  }
+  const rebuilding = residentTransport !== null
+  stopResidentTransport()
+  residentTransportKey = key
+  residentTransport = new ResidentProcess({
+    argv: [process.execPath, cfg.egoBin, 'nodejs', '--serve', ...extraCliArgs],
+    env: resolveEgoEnv(cfg),
+    cwd: process.cwd(),
+    graceMs: cfg.graceMs,
+    idleMs: cfg.residentIdleMin > 0 ? cfg.residentIdleMin * 60_000 : 0,
+    onExit: () => {
+      // A crashed/hung resident is replaced lazily by the next call; nothing to
+      // do here but keep the reference honest.
+    },
+  })
+  residentTransport.start()
+  residentStartedAt = Date.now()
+  residentLastRebuildReason = rebuilding ? 'rebuilt: configuration changed' : 'created'
+  return residentTransport
+}
+
+/** Map a resident frame onto the shape the one-shot spawn path returns. */
+function residentFrameToResult(frame: ResidentFrame): WarmupResult {
+  const stdout = frame.stdout
+  const stderr = frame.stderr
+  if (!frame.ok) {
+    return {
+      ok: false,
+      error: `ego-browser script failed: ${frame.error ?? 'unknown failure'}${describeStderr(stderr)}`,
+      stdout,
+      stderr,
+    }
+  }
+  const parsed = parseSentinelOrLastJson(stdout)
+  if (parsed === undefined) {
+    return {
+      ok: false,
+      error: `ego-browser finished but no ${SENTINEL} JSON payload was found on stdout${describeStderr(
+        stderr,
+      )}`,
+      stdout,
+      stderr,
+    }
+  }
+  const value = parsed.fallback ? { ...parsed.value, fallback: true } : parsed.value
+  return { ok: true, value, stdout, stderr }
+}
+
+
 async function runEgoScript(subprocess: SubprocessService, script: string, exec: ExecLike, cfg: EgoRuntimeConfig, graceOverrideMs?: number): Promise<WarmupResult> {
+  // Resident path (opt-in, issue #56). Only a request that was never written
+  // falls back to the one-shot spawn below: once written, a retry could
+  // double-execute a click/fill, so the resident reports the failure instead.
+  if (cfg.residentExecutor && Date.now() >= residentCooldownUntil) {
+    let transport: ResidentProcess | null = null
+    try {
+      transport = ensureResidentTransport(cfg)
+    } catch {
+      transport = null // spawn failed; the one-shot path below reports it
+    }
+    if (transport !== null) {
+      try {
+        const frame = await transport.run(script, {
+          ...(exec.signal !== undefined ? { signal: exec.signal } : {}),
+          ...(Number.isFinite(graceOverrideMs) && graceOverrideMs! > 0 ? { graceMs: graceOverrideMs! } : {}),
+        })
+        const result = residentFrameToResult(frame)
+        if (result.ok) {
+          residentConsecutiveFailures = 0
+          residentParkReason = null
+          return result
+        }
+        if (!isColdStartError(result.error ?? '')) return result
+        // Cold-start failure: the script never reached the browser (dead CDP
+        // channel, or a relaunch that has not settled). Safe to retry — park
+        // the resident and let the one-shot path below (with its launch
+        // retries) run this call. Three consecutive failures park it for good
+        // (until the setting is toggled or the plugin restarts), so we stop
+        // alternating park -> one-shot -> respawn (issue #73).
+        const supervision = superviseResidentFailure(residentConsecutiveFailures, result.error ?? 'cold start')
+        residentConsecutiveFailures = supervision.failures
+        residentLastRebuildReason = `cold-start failure: ${result.error ?? 'unknown'}`
+        if (supervision.parkReason !== null) {
+          residentParkReason = supervision.parkReason
+          residentCooldownUntil = Number.MAX_SAFE_INTEGER
+        } else {
+          residentCooldownUntil = Date.now() + 10_000
+        }
+        stopResidentTransport()
+      } catch (err) {
+        if (!(err instanceof ResidentNotRunningError)) {
+          return {
+            ok: false,
+            error: err instanceof Error ? err.message : String(err),
+            stdout: '',
+            stderr: '',
+          }
+        }
+        // not written → retry through the one-shot path
+      }
+    }
+  } else if (!cfg.residentExecutor) {
+    if (residentTransport !== null) stopResidentTransport()
+    if (residentParkReason !== null || residentConsecutiveFailures !== 0) {
+      residentConsecutiveFailures = 0
+      residentParkReason = null
+      residentLastRebuildReason = 'disabled by setting'
+    }
+  }
   let handle
   try {
     // User-configured extra ego-browser CLI args (settings field `egoCliArgs`).
@@ -609,8 +909,8 @@ async function runEgoScript(subprocess: SubprocessService, script: string, exec:
       stderr,
     }
   }
-  const value = parseSentinel(stdout)
-  if (value === undefined) {
+  const parsed = parseSentinelOrLastJson(stdout)
+  if (parsed === undefined) {
     return {
       ok: false,
       error: `ego-browser finished but no ${SENTINEL} JSON payload was found on stdout${describeStderr(
@@ -620,6 +920,7 @@ async function runEgoScript(subprocess: SubprocessService, script: string, exec:
       stderr,
     }
   }
+  const value = parsed.fallback ? { ...parsed.value, fallback: true } : parsed.value
   return { ok: true, value, stdout, stderr }
 }
 // ── tool plumbing ───────────────────────────────────────────────────────────
@@ -677,6 +978,10 @@ interface EgoToolOptions {
   afterExecute?: (args: Record<string, unknown>, value: unknown) => void
 }
 
+function observeEgoTool<T>(cfg: EgoRuntimeConfig, name: string, args: Record<string, unknown>, run: () => Promise<T> | T): Promise<T> {
+  return cfg.observeTool ? cfg.observeTool(name, args, run) : Promise.resolve().then(run)
+}
+
 function defineEgoTool(ctx: EgoContext, cfg: EgoRuntimeConfig, opts: EgoToolOptions): ToolHandle {
   return defineTool({
     name: opts.name,
@@ -688,7 +993,7 @@ function defineEgoTool(ctx: EgoContext, cfg: EgoRuntimeConfig, opts: EgoToolOpti
     },
     timeoutMs: TOOL_TIMEOUT_MS,
     execute: async (args: Record<string, unknown>, exec: ToolExec) =>
-      withEgoLock(async () => {
+      withEgoLock(() => observeEgoTool(cfg, opts.name, args, async () => {
         // Signal the client to auto-open the sidebar Tab on the first ego_*
         // tool call. markEgoToolCall() bumps a host-side counter surfaced via
         // /api/ego/spaces; the LivePreviewController transitions on 0 → >0 and
@@ -703,10 +1008,10 @@ function defineEgoTool(ctx: EgoContext, cfg: EgoRuntimeConfig, opts: EgoToolOpti
         if (typeof opts.afterExecute === 'function') opts.afterExecute(args, result.value)
         // Value is JSON.parse output of our own payload — fits the tool JSON contract.
         return result.value
-      }),
-    presentCall: () => ({
+      })),
+    presentCall: (args: unknown) => ({
       card: 'generic',
-      title: opts.name,
+      title: toolCallTitle(opts.name, args),
       kind: 'other',
       rawInput: null,
     }),
@@ -725,6 +1030,9 @@ export function apply(ctx: EgoContext, config: RawConfig = {}): void {
     'castFpsCap', 'screencastQuality', 'screencastMaxWidth', 'backstopIntervalMs',
     'idleTimeoutMin',
     'disableFrameRelay',
+    'tuiAutoOpenPanel',
+    'residentExecutor',
+    'residentIdleMin',
   ]
   const entry = Object.fromEntries(settingKeys.filter((key) => config[key] !== undefined).map((key) => [key, config[key]]))
   // DSH 0.1.7：可注册的 settings 命名空间被换成了 loader 条目上的配置文档，用户
@@ -785,8 +1093,39 @@ export function apply(ctx: EgoContext, config: RawConfig = {}): void {
     // Live getter: cast-server reads this on EVERY /api/ego/* request, so the
     // settings card toggle takes effect without a host restart.
     get disableFrameRelay() { return resolveConfig(bridge.source() as RawConfig).disableFrameRelay },
+    get tuiAutoOpenPanel() { return resolveConfig(bridge.source() as RawConfig).tuiAutoOpenPanel },
+    // #56: resident executor (opt-in) and its idle window. Both are read on
+    // every call, so toggling the setting takes effect on the next ego_* call.
+    get residentExecutor() { return resolveConfig(bridge.source() as RawConfig).residentExecutor },
+    get residentIdleMin() { return resolveConfig(bridge.source() as RawConfig).residentIdleMin },
+  }
+  const browserState = new BrowserStateStore()
+  const tui = installTui(ctx, browserState)
+  installBrowserPanel(ctx, cfg, browserState, tui, {
+    createTransport: () => ({ readBrowserState, readTaskSpaceGroups, ensureWorker: makeEnsureWorker(ctx, cfg, ffmpegManager), get: proxyFrom, post: proxyPost }),
+    openAgentWindow: () => openAgentWindow(ctx, cfg),
+  })
+  cfg.onColdStartFailure = () => tui.toast('Agent Browser could not start after retrying. Run ego_doctor for details.', 'error')
+  cfg.observeTool = async (name, args, run) => {
+    const token = browserState.startTool(name, safeLocatorSummary(name, args))
+    try {
+      const value = await run()
+      const result = value as { ok?: boolean; error?: unknown } | null
+      const error = typeof result?.error === 'string' ? result.error : undefined
+      browserState.finishTool(token, { ok: result?.ok !== false, error })
+      return value
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      browserState.finishTool(token, { ok: false, error: message })
+      throw error
+    }
   }
   const reg = (tool: ToolHandle): void => {
+    // These standalone tools do not take the shared browser lock.
+    if (['ego_cli', 'ego_script', 'ego_help', 'ego_doctor'].includes(tool.name)) {
+      const execute = tool.execute
+      tool.execute = (args, exec) => observeEgoTool(cfg, tool.name, args as Record<string, unknown>, () => execute(args, exec))
+    }
     const dispose = ctx.tools.register(tool) as unknown as () => void
     // Cordis lifecycle: unregister the tool when the plugin unmounts.
     ctx.effect?.(() => dispose)
@@ -820,6 +1159,7 @@ export function apply(ctx: EgoContext, config: RawConfig = {}): void {
         ffmpegManager,
         () => openAgentWindow(ctx, cfg),
         (opts) => importLoginCookies(opts, { subprocess: ctx.subprocess }),
+        () => residentDiagnostics(cfg) as unknown as Record<string, unknown>,
       )
     } catch (err) {
       ctx.logger?.warn?.(
@@ -865,8 +1205,18 @@ export function apply(ctx: EgoContext, config: RawConfig = {}): void {
               ? (e.LOCALAPPDATA || `${home}\\AppData\\Local`) + '\\ego-lite-linux'
               : `${e.XDG_STATE_HOME || `${home}/.local/state`}/ego-lite-linux`)
           const { readFile } = await import('node:fs/promises')
+          let reapedPid: number | undefined
           try {
-            await readFile(`${stateDir}/browser.json`, 'utf8')
+            const stateText = await readFile(`${stateDir}/browser.json`, 'utf8')
+            if (tui.hasToast()) {
+              try {
+                const pid = JSON.parse(stateText).pid
+                if (Number.isInteger(pid) && pid > 0) {
+                  process.kill(pid, 0)
+                  reapedPid = pid
+                }
+              } catch { /* Only announce a confirmed live browser being stopped. */ }
+            }
           } catch {
             return // no state file → no browser → nothing to reap
           }
@@ -883,7 +1233,14 @@ export function apply(ctx: EgoContext, config: RawConfig = {}): void {
             },
             graceMs: 8_000,
           })
-          handle.done.catch(() => null)
+          void handle.done.then(outcome => {
+            if (outcome.exitCode !== 0 || reapedPid === undefined || !tui.hasToast()) return
+            try { process.kill(reapedPid, 0) } catch (error) {
+              if ((error as NodeJS.ErrnoException).code === 'ESRCH') {
+                tui.toast('Agent Browser stopped after the idle timeout.', 'success')
+              }
+            }
+          }).catch(() => null)
         } catch {
           // never let the reaper throw
         }
@@ -891,6 +1248,10 @@ export function apply(ctx: EgoContext, config: RawConfig = {}): void {
     }, 60_000)
     return () => clearInterval(timer)
   }, 'ego-browser: idle reaper')
+  // #56: stop the resident --serve process when the plugin unmounts. The
+  // browser itself is stopped by the teardown effect below; the resident is
+  // only a stdio peer and must not outlive the plugin.
+  ctx.effect?.(() => () => stopResidentTransport(), 'ego-browser: resident executor')
   // Graceful teardown: stop the persistent browser when the plugin unmounts.
   // CRITICAL: this must be fire-and-forget, NOT awaited. Awaiting `--stop`
   // (which asks the browser to graceful-close, ~seconds) stalls the host process
@@ -946,6 +1307,7 @@ function registerEgoStatus(ctx: EgoContext, cfg: EgoRuntimeConfig, reg: (tool: T
             available: { type: 'boolean', required: true },
             path: { type: 'string' },
             exitCode: { type: 'integer' },
+            resident: { type: 'object', additionalProperties: true },
           },
         },
         render: renderText,
@@ -955,8 +1317,8 @@ function registerEgoStatus(ctx: EgoContext, cfg: EgoRuntimeConfig, reg: (tool: T
       // budget so it does not report "unavailable" merely because the backing
       // browser was still warming up.
       timeoutMs: 25_000,
-      execute: async () =>
-        withEgoLock(async () => {
+      execute: async (args: Record<string, unknown>) =>
+        withEgoLock(() => observeEgoTool(cfg, 'ego_status', args, async () => {
           try {
             const handle = ctx.subprocess.spawn({
               argv: [process.execPath, cfg.egoBin, '--status'],
@@ -976,6 +1338,7 @@ function registerEgoStatus(ctx: EgoContext, cfg: EgoRuntimeConfig, reg: (tool: T
               available: outcome.exitCode === 0 && out !== '',
               path: cfg.egoBin,
               exitCode: outcome.exitCode,
+              resident: residentDiagnostics(cfg),
             }
           } catch (err) {
             return {
@@ -986,10 +1349,10 @@ function registerEgoStatus(ctx: EgoContext, cfg: EgoRuntimeConfig, reg: (tool: T
               error: describeSpawnFailure(err),
             }
           }
-        }),
-      presentCall: () => ({
+        })),
+      presentCall: (args: unknown) => ({
         card: 'generic',
-        title: 'ego_status',
+        title: toolCallTitle('ego_status', args),
         kind: 'other',
         rawInput: null,
       }),
@@ -1018,8 +1381,8 @@ function registerAuthFlush(ctx: EgoContext, cfg: EgoRuntimeConfig, reg: (tool: T
         render: renderText,
       },
       timeoutMs: 10_000,
-      execute: async () =>
-        withEgoLock(async () => {
+      execute: async (args: Record<string, unknown>) =>
+        withEgoLock(() => observeEgoTool(cfg, 'ego_auth_flush', args, async () => {
           try {
             const { readFile } = await import('node:fs/promises')
             // Mirror the ego-cast worker's state-dir discovery so the flush
@@ -1068,10 +1431,10 @@ function registerAuthFlush(ctx: EgoContext, cfg: EgoRuntimeConfig, reg: (tool: T
           } catch (err) {
             return { ok: false, error: String((err as Error)?.message || err) }
           }
-        }),
-      presentCall: () => ({
+        })),
+      presentCall: (args: unknown) => ({
         card: 'generic',
-        title: 'ego_auth_flush',
+        title: toolCallTitle('ego_auth_flush', args),
         kind: 'other',
         rawInput: null,
       }),
@@ -1079,16 +1442,84 @@ function registerAuthFlush(ctx: EgoContext, cfg: EgoRuntimeConfig, reg: (tool: T
   )
 }
 /** `ego_login_import` — copy login cookies from the system browser (issue #46). */
+/**
+ * #69 policy: `ego_login_import` is unsafe on Windows because the import boots
+ * the REAL profile through a junction alias and hard-kills the instance. Chrome
+ * App-Bound Encryption (127+) is what makes the data-loss path possible (and
+ * the cookie read fail), so the guard covers every ABE-capable build, not only
+ * the 155 build where the damage was first observed. Linux/macOS use a different
+ * profile-handoff path and stay enabled. The env flag remains a manual override.
+ *
+ * Exported for tests.
+ */
+export function loginImportPolicy({
+  platform,
+  chromeMajor,
+  force,
+}: {
+  platform: NodeJS.Platform
+  chromeMajor: number | null
+  force: boolean
+}): { allowed: boolean; reason?: string } {
+  if (force) return { allowed: true }
+  if (platform !== 'win32') return { allowed: true }
+  if (chromeMajor === null) {
+    return {
+      allowed: false,
+      reason:
+        'could not determine the installed Chrome version on Windows; refusing to risk the source profile (set EGO_LINUX_LOGIN_IMPORT_FORCE=1 to override)',
+    }
+  }
+  if (chromeMajor >= 127) {
+    return {
+      allowed: false,
+      reason: `Chrome ${chromeMajor} on Windows uses App-Bound Encryption (127+), which makes the current import path both unable to read cookies and potentially destructive to the source profile (#69). Set EGO_LINUX_LOGIN_IMPORT_FORCE=1 to override.`,
+    }
+  }
+  return { allowed: true }
+}
+
+/** Is the manual override set? */
+export function loginImportForced(env: NodeJS.ProcessEnv = process.env): boolean {
+  return /^(1|true|yes|on)$/i.test(env.EGO_LINUX_LOGIN_IMPORT_FORCE ?? '')
+}
+
+/**
+ * Best-effort major version of the Chrome-family binary the import would use.
+ *
+ * Windows: Chrome keeps one `<major>.<minor>.<build>.<patch>` directory under
+ * the `Application` directory next to chrome.exe — cheap and reliable. Elsewhere
+ * ask the binary itself (`--version`), which is what the platform expects. Any
+ * failure returns null; the policy treats null conservatively on Windows.
+ * Exported for tests.
+ */
+export function detectChromeMajorVersion(binPath: string | null | undefined): number | null {
+  if (!binPath) return null
+  try {
+    if (process.platform === 'win32') {
+      const versions = readdirSync(dirname(binPath))
+        .filter((entry) => /^\d+\.\d+\.\d+\.\d+$/.test(entry))
+        .map((entry) => Number(entry.split('.')[0]))
+        .filter((major) => Number.isInteger(major) && major > 0)
+      return versions.length === 0 ? null : Math.max(...versions)
+    }
+    const out = execFileSync(binPath, ['--version'], { encoding: 'utf8', timeout: 5000 })
+    const match = String(out).match(/(\d+)\.\d+\.\d+/)
+    return match ? Number(match[1]) : null
+  } catch {
+    return null
+  }
+}
 function registerLoginImport(ctx: EgoContext, cfg: EgoRuntimeConfig, reg: (tool: ToolHandle) => void): void {
   reg(
     defineTool({
       name: 'ego_login_import',
       description:
-        'Import login cookies from the system browser (Chrome/Edge/Brave) into the agent browser, so sites open already logged in. Works via a throwaway headless instance of the REAL system browser (CDP passthrough — no offline decryption; survives Chrome App-Bound Encryption). Run with dryRun=true first to see what is importable, then import with an explicit domains list (e.g. ["bilibili.com"]). The agent browser must be running (call ego_status first). Imported logins persist in the on-disk profile across restarts. Cookie values are never shown — only domain names and counts.',
+        'Import login cookies from the system browser into the agent browser, so sites open already logged in, with two SAFE routes (#69): (1) source="extension" — load the companion extension/ folder once in Chrome/Edge, keep the browser open, run this with explicit domains and click Export in the extension popup; cookies are read through the browser\'s own cookies API and POSTed to a loopback receiver (token file: <stateDir>/login-extension-token). This works on modern Chrome/Edge (including Windows 127+ ABE). (2) source="chrome"|"edge"|"brave"|"auto" — the source browser must be closed; the tool copies only Local State + the Cookies DB to a throwaway profile and reads it headless. On Chrome/Edge 127+ (App-Bound Encryption) that copy reads 0 cookies and the tool reports it explicitly; the real profile is never booted or modified. dryRun=true reports what would be imported. The agent browser must be running (call ego_status first). Imported logins persist in the on-disk profile. Cookie values are never shown — only domain names and counts.',
       parameters: {
         source: {
           type: 'string',
-          description: 'chrome | edge | brave | auto (default: auto = first detected browser).',
+          description: 'extension | chrome | edge | brave | auto (default: auto = first detected browser). Use "extension" for modern Chrome/Edge without closing it.',
         },
         domains: {
           type: 'json',
@@ -1123,20 +1554,44 @@ function registerLoginImport(ctx: EgoContext, cfg: EgoRuntimeConfig, reg: (tool:
             written: { type: 'integer' },
             domains: { type: 'json' },
             closedSource: { type: 'boolean' },
-            restoredFromBackup: { type: 'boolean' },
+            disabled: { type: 'boolean' },
             error: { type: 'string' },
           },
         },
         render: renderText,
       },
-      timeoutMs: 60_000,
+      timeoutMs: 180_000,
       execute: async (args: Record<string, unknown>) =>
-        withEgoLock(async () => {
+        withEgoLock(() => observeEgoTool(cfg, 'ego_login_import', args, async () => {
           try {
             const domains = Array.isArray(args.domains) ? (args.domains as unknown[]).map(String) : undefined
             const source = typeof args.source === 'string' && args.source !== '' ? args.source : 'auto'
-            if (!['chrome', 'edge', 'brave', 'auto'].includes(source)) {
-              return { ok: false, error: `invalid source "${source}" — expected chrome|edge|brave|auto` }
+            if (!['chrome', 'edge', 'brave', 'auto', 'extension'].includes(source)) {
+              return { ok: false, error: `invalid source "${source}" — expected chrome|edge|brave|auto|extension` }
+            }
+            // #69 (A): the extension bridge is side-effect-free and works on
+            // modern Chrome/Edge, so it bypasses the Windows-ABE guard.
+            if (source === 'extension') {
+              return await importLoginCookiesFromExtension({
+                domains,
+                dryRun: args.dryRun === true,
+                timeoutMs: 120_000,
+              })
+            }
+            // Scoped #69 guard: Windows + Chrome/Edge 127+ (App-Bound
+            // Encryption) is refused — see loginImportPolicy above.
+            const guardBinary = cfg.chromePath || findChromeBinary()
+            const policy = loginImportPolicy({
+              platform: process.platform,
+              chromeMajor: detectChromeMajorVersion(guardBinary),
+              force: loginImportForced(),
+            })
+            if (!policy.allowed) {
+              return {
+                ok: false,
+                disabled: true,
+                error: `ego_login_import is disabled here: ${policy.reason}`,
+              }
             }
             return await importLoginCookies(
               {
@@ -1151,10 +1606,10 @@ function registerLoginImport(ctx: EgoContext, cfg: EgoRuntimeConfig, reg: (tool:
           } catch (err) {
             return { ok: false, error: String((err as Error)?.message || err) }
           }
-        }),
-      presentCall: () => ({
+        })),
+      presentCall: (args: unknown) => ({
         card: 'generic',
-        title: 'ego_login_import',
+        title: toolCallTitle('ego_login_import', args),
         kind: 'other',
         rawInput: null,
       }),
@@ -1520,6 +1975,50 @@ function registerActionTools(ctx: EgoContext, cfg: EgoRuntimeConfig, reg: (tool:
   )
   reg(
     t({
+      name: 'ego_tabs',
+      description:
+        'List, switch, open, or close agent-browser tabs. Use it to keep tab hygiene: list the open pages, switch to one, open a new tab for a URL, or close scratch tabs. Tab ids are stable target ids (also returned by ego_space_open / ego_navigate).',
+      parameters: {
+        action: {
+          type: 'string',
+          description: "'list' (default) | 'switch' | 'open' | 'close'.",
+        },
+        targetId: {
+          type: 'string',
+          description: 'Tab target id for action=switch / action=close.',
+        },
+        url: {
+          type: 'string',
+          description: "URL for action=open (default: 'about:blank').",
+        },
+        space: spaceParam,
+      },
+      buildScript: (args) => {
+        const action = str(args.action, 'list')
+        const targetId = str(args.targetId, '')
+        const url = str(args.url, '')
+        const space = useSpace(str(args.space, cfg.defaultSpace))
+        const done = (extra: string): string =>
+          `const __tabs = await browser.listTabs()\n` +
+          `console.log('${SENTINEL}' + JSON.stringify({ ok: true${extra}, tabs: __tabs }))\n`
+        if (action === 'switch') {
+          if (!targetId) return `${space}console.log('${SENTINEL}' + JSON.stringify({ ok: false, error: 'targetId is required for action=switch' }))\n`
+          return `${space}await browser.switchTab(${j(targetId)})\n${done(`, switched: ${j(targetId)}`)}`
+        }
+        if (action === 'open') {
+          return `${space}const __created = await ego.createTab(${j(url || 'about:blank')})\n${done(`, created: __created && __created.targetId || null`)}`
+        }
+        if (action === 'close') {
+          if (!targetId) return `${space}console.log('${SENTINEL}' + JSON.stringify({ ok: false, error: 'targetId is required for action=close' }))\n`
+          return `${space}await browser.closeTab(${j(targetId)})\n${done(`, closed: ${j(targetId)}`)}`
+        }
+        if (action !== 'list') return `${space}console.log('${SENTINEL}' + JSON.stringify({ ok: false, error: ${j(`unknown action: ${action}`)} }))\n`
+        return `${space}${done('')}`
+      },
+    }),
+  )
+  reg(
+    t({
       name: 'ego_wait',
       description:
         'Pause for a fixed number of milliseconds (e.g. for animations or partial loads). For load waits prefer ego_navigate\'s wait option.',
@@ -1581,7 +2080,7 @@ function registerActionTools(ctx: EgoContext, cfg: EgoRuntimeConfig, reg: (tool:
     t({
       name: 'ego_wait_for_url',
       description:
-        'Wait until the page navigates to a URL matching a substring / glob / regex. Use to catch login redirects or pagination.',
+        'Wait until the page navigates to a URL matching a substring / glob / regex. Use to catch login redirects or pagination. IMPORTANT: it only observes navigations that happen DURING this call — if the navigation already finished in a previous ego_* call, read ego_page_info instead. Matching is Playwright semantics: a full URL or a ** glob ("**/search**"); a bare substring does not match. The result always carries the current URL.',
       parameters: {
         pattern: {
           type: 'string',
@@ -1599,14 +2098,23 @@ function registerActionTools(ctx: EgoContext, cfg: EgoRuntimeConfig, reg: (tool:
         const p = str(args.pattern, '').trim()
         if (p === '')
           return `console.log('${SENTINEL}' + JSON.stringify({ ok: false, reached: false, reason: 'ego_wait_for_url: pattern is required' }))\n`
+        // Two-phase: read the current URL first (the navigation may already have
+        // completed before this call — the classic false negative in #71), then
+        // wait for a FUTURE one. The pre-check is deliberately conservative: it
+        // only accepts substring matches for glob-free patterns, so it never
+        // claims a glob/regex was reached without the real wait doing the work.
         return (
           `${useSpace(str(args.space, cfg.defaultSpace))}${ensureRealTab()}` +
-          `const __ok = await page.waitForURL(${j(p)}, { timeout: ${num(
+          `const __u0 = await page.url()\n` +
+          `const __p = ${j(p)}\n` +
+          `const __isPattern = /[*?[\\\\]]/.test(__p) || __p.startsWith('/')\n` +
+          `const __already = !__isPattern && __u0.includes(__p)\n` +
+          `const __ok = __already || await page.waitForURL(__p, { timeout: ${num(
             args.timeout,
             10000,
           )} }).catch(() => false)\n` +
           `const __u = await page.url()\n` +
-          `console.log('${SENTINEL}' + JSON.stringify({ ok: !!__ok, reached: !!__ok, url: __u }))\n`
+          `console.log('${SENTINEL}' + JSON.stringify({ ok: !!__ok, reached: !!__ok, url: __u, matchedCurrent: __already, hint: __ok ? undefined : 'waitForURL only sees FUTURE navigations: issue the wait in the same ego_script as the action that navigates, and pass a full URL or a ** glob (a bare substring does not match).' }))\n`
         )
       },
     }),
@@ -1615,7 +2123,7 @@ function registerActionTools(ctx: EgoContext, cfg: EgoRuntimeConfig, reg: (tool:
     t({
       name: 'ego_wait_for_response',
       description:
-        'Wait for a network response matching a URL/glob/regex and return it. Optionally return the body (text or JSON) — ideal for scraping API responses or confirming a submission.',
+        'Wait for a network response matching a URL/glob/regex and return it. Optionally return the body (text or JSON) — ideal for scraping API responses or confirming a submission. It only observes responses that arrive DURING this call: trigger the request and wait in the same ego_script. On timeout the result carries the current URL and a hint instead of throwing.',
       parameters: {
         url: {
           type: 'string',
@@ -1638,14 +2146,23 @@ function registerActionTools(ctx: EgoContext, cfg: EgoRuntimeConfig, reg: (tool:
         const u = str(args.url, '').trim()
         const mode = str(args.body, 'none')
         const wantBody = mode === 'text' || mode === 'json'
+        // A timeout must not throw: the tool's job is to report "not reached"
+        // with context (current URL) so the caller can decide, not to blow up
+        // the whole ego_* call (#71).
         return (
           `${useSpace(str(args.space, cfg.defaultSpace))}${ensureRealTab()}` +
-          `const __res = await page.waitForResponse(${j(u)}, { timeout: ${num(
+          `let __res = null, __err = null\n` +
+          `try { __res = await page.waitForResponse(${j(u)}, { timeout: ${num(
             args.timeout,
             10000,
-          )} })\n` +
-          `${wantBody ? `const __body = ${mode === 'json' ? 'await __res.json().catch(()=>null)' : 'await __res.text().catch(()=>null)'}\n` : ''}` +
-          `console.log('${SENTINEL}' + JSON.stringify({ ok: true, url: __res.url(), status: __res.status()${wantBody ? ', body: __body' : ''} }))\n`
+          )} }) } catch (e) { __err = String(e && e.message || e) }\n` +
+          `if (!__res) {\n` +
+          `  const __u = await page.url().catch(() => null)\n` +
+          `  console.log('${SENTINEL}' + JSON.stringify({ ok: false, reached: false, url: __u, error: __err, hint: 'no matching response arrived during this call. Issue the request and the wait in the same ego_script; the url pattern is a full URL or glob/regex, not a bare substring.' }))\n` +
+          `} else {\n` +
+          `${wantBody ? `  const __body = ${mode === 'json' ? 'await __res.json().catch(()=>null)' : 'await __res.text().catch(()=>null)'}\n` : ''}` +
+          `  console.log('${SENTINEL}' + JSON.stringify({ ok: true, reached: true, url: __res.url(), status: __res.status()${wantBody ? ', body: __body' : ''} }))\n` +
+          `}\n`
         )
       },
     }),
@@ -1978,7 +2495,7 @@ function registerActionTools(ctx: EgoContext, cfg: EgoRuntimeConfig, reg: (tool:
     t({
       name: 'ego_dialog',
       description:
-        'Accept or dismiss a native browser dialog (alert/confirm/prompt), optionally supplying text for a prompt. Use right after the action that triggers the dialog.',
+        'Accept or dismiss a native browser dialog (alert/confirm/prompt), optionally supplying text for a prompt. This tool only reaches a dialog that is blocking the page RIGHT NOW — a dialog fired by an earlier ego_* call has already been auto-dismissed across the call boundary. To accept a dialog triggered by a click, do both in one call: page.once("dialog", d => d.accept()); await page.click(selector). If a dialog is blocking the page, page.evaluate/snapshot calls hang until it is handled.',
       parameters: {
         accept: { type: 'boolean', description: 'true=Accept/OK (default), false=Dismiss/Cancel.' },
         text: { type: 'string', description: 'Text to type into a prompt dialog.' },
@@ -1992,12 +2509,17 @@ function registerActionTools(ctx: EgoContext, cfg: EgoRuntimeConfig, reg: (tool:
         } }`
         // Do NOT run any page.evaluate here: while a dialog is showing the page
         // JS is paused, so a Runtime.evaluate would hang. handleJavaScriptDialog
-        // is a CDP command and works even under a blocking dialog.
+        // is a CDP command and works even under a blocking dialog. The URL read
+        // is therefore only attempted on the failure path (no dialog => the page
+        // is not blocked and evaluate is safe), where it tells the caller what
+        // page the dialog "was not on".
         return (
           `${useSpace(str(args.space, cfg.defaultSpace))}${ensureRealTab()}` +
           `const __r = await cdp("Page.handleJavaScriptDialog", ${params}).catch((e) => ({ error: String(e) }))\n` +
           `const __ok = !!(__r && !__r.error)\n` +
-          `console.log('${SENTINEL}' + JSON.stringify({ ok: true, handled: __ok, accept: ${accept}, error: __r?.error ?? null }))\n`
+          `let __u = null\n` +
+          `if (!__ok) { try { __u = await page.url() } catch {} }\n` +
+          `console.log('${SENTINEL}' + JSON.stringify({ ok: true, handled: __ok, accept: ${accept}, error: __r?.error ?? null, url: __u, hint: __ok ? undefined : 'no dialog was blocking the page. Dialogs do not survive the call that triggered them — trigger and handle in one ego_script: page.once("dialog", d => d.accept()); await page.click(...)' }))\n`
         )
       },
     }),
@@ -2051,7 +2573,7 @@ function registerActionTools(ctx: EgoContext, cfg: EgoRuntimeConfig, reg: (tool:
             type: 'string',
             required: true,
             description:
-              'Full JS script body for the heredoc; ego-browser helpers are preloaded. End with console.log(JSON.stringify(...)) for a parseable sentinel payload.',
+              "Full JS script body for the heredoc; ego-browser helpers are preloaded. End with console.log('@@DSH_RESULT@@' + JSON.stringify({...})) — the literal @@DSH_RESULT@@ sentinel is required. (A trailing plain JSON line is accepted as a fallback, with result.fallback=true.)",
           },
         },
         output: {
@@ -2077,12 +2599,14 @@ function registerActionTools(ctx: EgoContext, cfg: EgoRuntimeConfig, reg: (tool:
             ok: true,
             stdout: result.stdout,
             stderr: result.stderr,
-            result: parsed ?? null,
+            // result.value carries the plugin's fallback (last JSON line) when
+            // the script forgot the sentinel — keep it visible here too (#71).
+            result: parsed ?? result.value ?? null,
           }
         },
-        presentCall: () => ({
+        presentCall: (args: unknown) => ({
           card: 'generic',
-          title: 'ego_cli',
+          title: toolCallTitle('ego_cli', args),
           kind: 'other',
           rawInput: null,
         }),
@@ -2117,7 +2641,7 @@ function registerHelpAndDoctor(ctx: EgoContext, cfg: EgoRuntimeConfig, reg: (too
       },
       timeoutMs: 15_000,
       execute: async (args: Record<string, unknown>, exec: ToolExec) =>
-        withEgoLock(async () => {
+        withEgoLock(() => observeEgoTool(cfg, 'ego_captcha', args, async () => {
           markEgoToolCall(callingSessionId(exec))
           const result = await runWithStaleSpaceRetry(
             ctx,
@@ -2134,8 +2658,8 @@ function registerHelpAndDoctor(ctx: EgoContext, cfg: EgoRuntimeConfig, reg: (too
             detected: !!hc?.detected,
             kind: hc?.kind ?? null,
           }
-        }),
-      presentCall: () => ({ card: 'generic', title: 'ego_captcha', kind: 'other', rawInput: null }),
+        })),
+      presentCall: (args: unknown) => ({ card: 'generic', title: toolCallTitle('ego_captcha', args), kind: 'other', rawInput: null }),
     } as unknown as DefineToolOpts),
   )
   reg(
@@ -2178,7 +2702,7 @@ function registerHelpAndDoctor(ctx: EgoContext, cfg: EgoRuntimeConfig, reg: (too
               : EGO_HELP_INDEX.overview)
         return { ok: true, topic: q || 'overview', text }
       },
-      presentCall: () => ({ card: 'generic', title: 'ego_help', kind: 'other', rawInput: null }),
+      presentCall: (args: unknown) => ({ card: 'generic', title: toolCallTitle('ego_help', args), kind: 'other', rawInput: null }),
     } as unknown as DefineToolOpts),
   )
   reg(
@@ -2207,7 +2731,7 @@ function registerHelpAndDoctor(ctx: EgoContext, cfg: EgoRuntimeConfig, reg: (too
         if (configured) {
           lines.push(`browser binary: ${configured} (from settings)`)
         } else {
-          lines.push(`browser binary: ${chrome || '(none found — set chromePath in settings, or set EGO_LINUX_CHROME, or install Chrome/Edge/Brave)'}`)
+          lines.push(`browser binary: ${chrome || '(none found — set chromePath in settings, or set EGO_LINUX_CHROME, or install Chrome/Edge/Brave; on Termux/Android: pkg install chromium)'}`)
         }
         // User-configured extra CLI args (effective after filtering). ego-CLI
         // args take effect on the next ego_* call; Chrome args only on the next
@@ -2253,7 +2777,7 @@ function registerHelpAndDoctor(ctx: EgoContext, cfg: EgoRuntimeConfig, reg: (too
         lines.push('npm/node: ' + process.version)
         return { ok: true, report: lines.join('\n') }
       },
-      presentCall: () => ({ card: 'generic', title: 'ego_doctor', kind: 'other', rawInput: null }),
+      presentCall: (args: unknown) => ({ card: 'generic', title: toolCallTitle('ego_doctor', args), kind: 'other', rawInput: null }),
     } as unknown as DefineToolOpts),
   )
   reg(
@@ -2261,13 +2785,13 @@ function registerHelpAndDoctor(ctx: EgoContext, cfg: EgoRuntimeConfig, reg: (too
       const def = defineTool({
         name: 'ego_script',
         description:
-          'Run an arbitrary `ego-browser nodejs` heredoc script in ONE invocation (same runtime/API as ego_cli: page/…locator/browser/taskSpaces/site/fetch/cdp preloaded), and return structured {ok, stdout, stderr, result, durationMs, timedOut}. Use for a full multi-step browser task as a single script.',
+          'Run an arbitrary `ego-browser nodejs` heredoc script in ONE invocation (same runtime/API as ego_cli: page/…locator/browser/taskSpaces/site/fetch/cdp preloaded), and return structured {ok, stdout, stderr, result, durationMs, timedOut}. Use for a full multi-step browser task as a single script. NOTE: `page` is the ego runtime page facade, NOT Playwright — it has goto/reload/info/url/title/locator/getBy*/waitFor*/evaluate/screenshot/snapshot/drainEvents/keyboard/mouse but no fill/click/type/press; use ego_fill/ego_click or page.locator(...). page.goto() does not return a Playwright Response; get status via ego_wait_for_response or page.info().',
         parameters: {
           script: {
             type: 'string',
             required: true,
             description:
-              'Full JS script body; end with console.log(JSON.stringify(...)) for a parseable sentinel payload.',
+              "Full JS script body; end with console.log('@@DSH_RESULT@@' + JSON.stringify({...})) — the literal @@DSH_RESULT@@ sentinel is required. (A trailing plain JSON line is accepted as a fallback, with result.fallback=true.)",
           },
           timeoutMs: { type: 'integer', description: 'Per-run timeout in ms (default plugin grace).' },
         },
@@ -2306,12 +2830,14 @@ function registerHelpAndDoctor(ctx: EgoContext, cfg: EgoRuntimeConfig, reg: (too
             ok: true,
             stdout: result.stdout,
             stderr: result.stderr,
-            result: parsed ?? null,
+            // result.value carries the plugin's fallback (last JSON line) when
+            // the script forgot the sentinel — keep it visible here too (#71).
+            result: parsed ?? result.value ?? null,
             durationMs,
             timedOut: false,
           }
         },
-        presentCall: () => ({ card: 'generic', title: 'ego_script', kind: 'other', rawInput: null }),
+        presentCall: (args: unknown) => ({ card: 'generic', title: toolCallTitle('ego_script', args), kind: 'other', rawInput: null }),
       } as unknown as DefineToolOpts)
       return def
     })(),

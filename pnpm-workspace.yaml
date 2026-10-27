@@ -1,11 +1,7 @@
 allowBuilds:
   esbuild: true
-
-# pnpm 11+ 内置 24 小时 minimumReleaseAge：新版发布未满 24h 时，pnpm install 会以
-# loose 模式把 name@version 追加进本文件，导致受管内容被改写。
-# Harness 侧每次升级都会带入几十个刚发布的 @deepseek-ai/* 包（DSH 仓实测
-# 0.1.2-rc.1→0.1.5-rc.1 追加 97 条），逐条预声明不可维护，故对本家 scope 整体
-# 豁免——与 DSH 仓 `scripts/install-tui.sh` 的既定做法保持一致。
-# 0.1.5-rc.1 时此处曾逐条列 20 个包，升级到 rc.2 后全部失效，遂改为通配。
 minimumReleaseAgeExclude:
-  - '@deepseek-ai/*'
+  - '@deepseek-ai/cosmokit@1.8.4'
+  - '@deepseek-ai/schemastery@3.18.3'
+onlyBuiltDependencies:
+  - esbuild
